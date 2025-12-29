@@ -242,7 +242,7 @@ flutter test       # Run tests
 
 ## 👨‍💻 Created By
 
-**Rohith** — MVGR College of Engineering
+**Team AIVENGERS** — MVGR College of Engineering
 
 > *"We're not building another social app. We're building a campus that respects students' time, attention, and genuine desire to connect."*
 
