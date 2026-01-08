@@ -520,10 +520,17 @@ class _JoinButton extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
+        final success = context.read<MockDataService>().joinTeamRequest(
+          team.id,
+          user.uid,
+          user.name,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Request to join "${team.title}" sent!'),
-            backgroundColor: AppColors.success,
+            content: Text(success 
+              ? 'You joined "${team.title}"!' 
+              : 'Could not join team'),
+            backgroundColor: success ? AppColors.success : AppColors.error,
           ),
         );
       },

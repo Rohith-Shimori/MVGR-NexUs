@@ -27,9 +27,14 @@ class AppColors {
   static const Color cardLight = Color(0xFFFFFFFF);
   
   // ============ DARK MODE BACKGROUNDS ============
-  static const Color backgroundDark = Color(0xFF0F172A);
-  static const Color surfaceDark = Color(0xFF1E293B);
-  static const Color cardDark = Color(0xFF1E293B);
+  // Premium dark with subtle blue undertones
+  static const Color backgroundDark = Color(0xFF0A0E1A);       // Deeper, richer dark
+  static const Color surfaceDark = Color(0xFF141824);          // Base surface
+  static const Color cardDark = Color(0xFF1A1F2E);             // Card background
+  static const Color surfaceElevatedDark = Color(0xFF1E2433);  // Elevated surfaces
+  static const Color inputBackgroundDark = Color(0xFF1A1F2E);  // Input fields
+  static const Color chipBackgroundDark = Color(0xFF252B3B);   // Chip/tag backgrounds
+  static const Color hoverDark = Color(0xFF252B3B);            // Hover states
   
   // ============ TEXT COLORS - LIGHT MODE ============
   static const Color textPrimaryLight = Color(0xFF0F172A);
@@ -37,19 +42,23 @@ class AppColors {
   static const Color textTertiaryLight = Color(0xFF94A3B8);
   
   // ============ TEXT COLORS - DARK MODE ============
-  static const Color textPrimaryDark = Color(0xFFF1F5F9);
-  static const Color textSecondaryDark = Color(0xFFCBD5E1);
-  static const Color textTertiaryDark = Color(0xFF64748B);
+  static const Color textPrimaryDark = Color(0xFFF8FAFC);     // Brighter for better readability
+  static const Color textSecondaryDark = Color(0xFFE2E8F0);   // Higher contrast
+  static const Color textTertiaryDark = Color(0xFF94A3B8);    // Subtle text
   
   // ============ SEMANTIC COLORS ============
   static const Color success = Color(0xFF10B981);
   static const Color successLight = Color(0xFF34D399);
+  static const Color successDark = Color(0xFF059669);         // Added for dark mode
   static const Color warning = Color(0xFFF59E0B);
   static const Color warningLight = Color(0xFFFBBF24);
+  static const Color warningDark = Color(0xFFD97706);         // Added for dark mode
   static const Color error = Color(0xFFEF4444);
   static const Color errorLight = Color(0xFFF87171);
+  static const Color errorDark = Color(0xFFDC2626);           // Added for dark mode
   static const Color info = Color(0xFF3B82F6);
   static const Color infoLight = Color(0xFF60A5FA);
+  static const Color infoDark = Color(0xFF2563EB);            // Added for dark mode
   
   // ============ FEATURE COLORS - Vibrant & Modern ============
   static const Color clubsColor = Color(0xFF8B5CF6);       // Violet
@@ -88,8 +97,8 @@ class AppColors {
   ];
   
   static const List<Color> darkGradient = [
-    Color(0xFF1E293B),
-    Color(0xFF0F172A),
+    Color(0xFF1A1F2E),
+    Color(0xFF0A0E1A),
   ];
   
   // Feature gradients
@@ -106,15 +115,15 @@ class AppColors {
   
   // ============ DIVIDER COLORS ============
   static const Color dividerLight = Color(0xFFE2E8F0);
-  static const Color dividerDark = Color(0xFF334155);
+  static const Color dividerDark = Color(0xFF2A3142);  // Softer for dark mode
   
   // ============ BORDER COLORS ============
   static const Color borderLight = Color(0xFFE2E8F0);
-  static const Color borderDark = Color(0xFF334155);
+  static const Color borderDark = Color(0xFF2A3142);   // Softer for dark mode
   
   // ============ GLASS EFFECT COLORS ============
   static Color glassLight = Colors.white.withValues(alpha: 0.8);
-  static Color glassDark = const Color(0xFF1E293B).withValues(alpha: 0.8);
+  static Color glassDark = const Color(0xFF1A1F2E).withValues(alpha: 0.85);
 }
 
 /// Theme-aware color provider
@@ -133,6 +142,12 @@ class ThemeColors {
   Color get background => isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
   Color get surface => isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
   Color get card => isDark ? AppColors.cardDark : AppColors.cardLight;
+  
+  // Elevated surfaces (for dark mode hierarchy)
+  Color get surfaceElevated => isDark ? AppColors.surfaceElevatedDark : AppColors.surfaceLight;
+  Color get inputBackground => isDark ? AppColors.inputBackgroundDark : Colors.grey.shade50;
+  Color get chipBackground => isDark ? AppColors.chipBackgroundDark : Colors.grey.shade100;
+  Color get hoverColor => isDark ? AppColors.hoverDark : Colors.grey.shade50;
   
   // Divider/Border colors
   Color get divider => isDark ? AppColors.dividerDark : AppColors.dividerLight;

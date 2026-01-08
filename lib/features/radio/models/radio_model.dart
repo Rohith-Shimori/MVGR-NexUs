@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../../core/constants/app_constants.dart';
 
 /// Radio session for live radio integration
@@ -23,14 +23,13 @@ class RadioSession {
     this.sessionTheme,
   });
 
-  factory RadioSession.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory RadioSession.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return RadioSession(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       djId: data['djId'] ?? '',
       djName: data['djName'] ?? '',
-      startTime: (data['startTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      endTime: (data['endTime'] as Timestamp?)?.toDate(),
+      startTime: data['startTime'] != null ? DateTime.parse(data['startTime']) : DateTime.now(),
+      endTime: data['endTime'] != null ? DateTime.parse(data['endTime']) : null,
       isLive: data['isLive'] ?? false,
       currentSong: data['currentSong'],
       sessionTheme: data['sessionTheme'],
@@ -41,8 +40,8 @@ class RadioSession {
     return {
       'djId': djId,
       'djName': djName,
-      'startTime': Timestamp.fromDate(startTime),
-      'endTime': endTime != null ? Timestamp.fromDate(endTime!) : null,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime?.toIso8601String(),
       'isLive': isLive,
       'currentSong': currentSong,
       'sessionTheme': sessionTheme,
@@ -85,10 +84,9 @@ class SongVote {
     this.playedAt,
   });
 
-  factory SongVote.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory SongVote.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return SongVote(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       sessionId: data['sessionId'] ?? '',
       songName: data['songName'] ?? '',
       artistName: data['artistName'],
@@ -98,8 +96,8 @@ class SongVote {
       voterIds: List<String>.from(data['voterIds'] ?? []),
       isPlayed: data['isPlayed'] ?? false,
       isApproved: data['isApproved'] ?? true,
-      requestedAt: (data['requestedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      playedAt: (data['playedAt'] as Timestamp?)?.toDate(),
+      requestedAt: data['requestedAt'] != null ? DateTime.parse(data['requestedAt']) : DateTime.now(),
+      playedAt: data['playedAt'] != null ? DateTime.parse(data['playedAt']) : null,
     );
   }
 
@@ -114,8 +112,8 @@ class SongVote {
       'voterIds': voterIds,
       'isPlayed': isPlayed,
       'isApproved': isApproved,
-      'requestedAt': Timestamp.fromDate(requestedAt),
-      'playedAt': playedAt != null ? Timestamp.fromDate(playedAt!) : null,
+      'requestedAt': requestedAt.toIso8601String(),
+      'playedAt': playedAt?.toIso8601String(),
     };
   }
 
@@ -149,10 +147,9 @@ class Shoutout {
     this.isRead = false,
   });
 
-  factory Shoutout.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Shoutout.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return Shoutout(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       sessionId: data['sessionId'],
       authorId: data['authorId'] ?? '',
       authorName: data['isAnonymous'] == true ? 'Anonymous' : (data['authorName'] ?? ''),
@@ -163,7 +160,7 @@ class Shoutout {
         (s) => s.name == data['status'],
         orElse: () => ModerationStatus.pending,
       ),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
       isRead: data['isRead'] ?? false,
     );
   }
@@ -177,7 +174,7 @@ class Shoutout {
       'dedicatedTo': dedicatedTo,
       'isAnonymous': isAnonymous,
       'status': status.name,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
       'isRead': isRead,
     };
   }
@@ -211,10 +208,9 @@ class InterviewQuestion {
     this.answer,
   });
 
-  factory InterviewQuestion.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory InterviewQuestion.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return InterviewQuestion(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       authorId: data['authorId'] ?? '',
       authorName: data['isAnonymous'] == true ? 'Anonymous' : (data['authorName'] ?? ''),
       question: data['question'] ?? '',
@@ -224,7 +220,7 @@ class InterviewQuestion {
         (s) => s.name == data['status'],
         orElse: () => ModerationStatus.pending,
       ),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
       isAnswered: data['isAnswered'] ?? false,
       answer: data['answer'],
     );
@@ -238,7 +234,7 @@ class InterviewQuestion {
       'targetPerson': targetPerson,
       'isAnonymous': isAnonymous,
       'status': status.name,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
       'isAnswered': isAnswered,
       'answer': answer,
     };

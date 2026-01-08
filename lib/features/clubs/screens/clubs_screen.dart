@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/helpers.dart';
 import '../../../services/mock_data_service.dart';
 import '../models/club_model.dart';
 import '../widgets/club_widgets.dart';
@@ -89,6 +91,14 @@ class _ClubsScreenState extends State<ClubsScreen> {
               ),
               const SizedBox(width: 8),
             ],
+          ),
+
+          // Pull to refresh
+          CupertinoSliverRefreshControl(
+            onRefresh: () async {
+              HapticUtils.pullToRefresh();
+              await Future.delayed(const Duration(milliseconds: 500));
+            },
           ),
 
           // Search and Filters

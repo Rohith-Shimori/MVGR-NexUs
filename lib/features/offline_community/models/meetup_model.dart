@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Meetup category for offline community events
 enum MeetupCategory {
@@ -153,10 +153,9 @@ class Meetup {
     this.tags = const [],
   });
 
-  factory Meetup.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Meetup.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return Meetup(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       organizerId: data['organizerId'] ?? '',
       organizerName: data['organizerName'] ?? '',
       title: data['title'] ?? '',
@@ -167,7 +166,7 @@ class Meetup {
       ),
       venue: data['venue'] ?? '',
       venueDetails: data['venueDetails'],
-      scheduledAt: (data['scheduledAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      scheduledAt: data['scheduledAt'] != null ? DateTime.parse(data['scheduledAt']) : DateTime.now(),
       duration: Duration(minutes: data['durationMinutes'] ?? 120),
       maxParticipants: data['maxParticipants'],
       participantIds: List<String>.from(data['participantIds'] ?? []),
@@ -176,7 +175,7 @@ class Meetup {
         orElse: () => RecurrenceType.once,
       ),
       isActive: data['isActive'] ?? true,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
       tags: List<String>.from(data['tags'] ?? []),
     );
   }
@@ -190,13 +189,13 @@ class Meetup {
       'category': category.name,
       'venue': venue,
       'venueDetails': venueDetails,
-      'scheduledAt': Timestamp.fromDate(scheduledAt),
+      'scheduledAt': scheduledAt.toIso8601String(),
       'durationMinutes': duration.inMinutes,
       'maxParticipants': maxParticipants,
       'participantIds': participantIds,
       'recurrence': recurrence.name,
       'isActive': isActive,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
       'tags': tags,
     };
   }

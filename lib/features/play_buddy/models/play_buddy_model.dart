@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Category for team/play buddy requests
 enum TeamCategory {
@@ -110,11 +110,10 @@ class TeamRequest {
     required this.createdAt,
   });
 
-  factory TeamRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory TeamRequest.fromFirestore(Map<String, dynamic> data, {String? id}) {
     final memberIds = List<String>.from(data['memberIds'] ?? []);
     return TeamRequest(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       creatorId: data['creatorId'] ?? '',
       creatorName: data['creatorName'] ?? '',
       title: data['title'] ?? '',
@@ -125,15 +124,15 @@ class TeamRequest {
       ),
       eventName: data['eventName'],
       eventUrl: data['eventUrl'],
-      eventDate: (data['eventDate'] as Timestamp?)?.toDate(),
+      eventDate: data['eventDate'] != null ? DateTime.parse(data['eventDate']) : null,
       teamSize: data['teamSize'] ?? 4,
       currentMembers: memberIds.length + 1,  // +1 for creator
       memberIds: memberIds,
       memberNames: List<String>.from(data['memberNames'] ?? []),
       requiredSkills: List<String>.from(data['requiredSkills'] ?? []),
-      deadline: (data['deadline'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      deadline: data['deadline'] != null ? DateTime.parse(data['deadline']) : DateTime.now(),
       status: data['status'] ?? 'open',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
     );
   }
 
@@ -146,14 +145,14 @@ class TeamRequest {
       'category': category.name,
       'eventName': eventName,
       'eventUrl': eventUrl,
-      'eventDate': eventDate != null ? Timestamp.fromDate(eventDate!) : null,
+      'eventDate': eventDate?.toIso8601String(),
       'teamSize': teamSize,
       'memberIds': memberIds,
       'memberNames': memberNames,
       'requiredSkills': requiredSkills,
-      'deadline': Timestamp.fromDate(deadline),
+      'deadline': deadline.toIso8601String(),
       'status': status,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
@@ -279,17 +278,16 @@ class JoinRequest {
     required this.createdAt,
   });
 
-  factory JoinRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory JoinRequest.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return JoinRequest(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       teamRequestId: data['teamRequestId'] ?? '',
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
       message: data['message'] ?? '',
       relevantSkills: List<String>.from(data['relevantSkills'] ?? []),
       status: data['status'] ?? 'pending',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
     );
   }
 
@@ -301,7 +299,7 @@ class JoinRequest {
       'message': message,
       'relevantSkills': relevantSkills,
       'status': status,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }

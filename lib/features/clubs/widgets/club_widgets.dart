@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/helpers.dart';
+import '../../../core/widgets/common_widgets.dart';
+import '../../../services/favorites_service.dart';
 import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
+import '../../council/models/report_model.dart';
 import '../models/club_model.dart';
 
 /// Category Chip - Filter chip for club categories
@@ -23,7 +27,10 @@ class CategoryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticUtils.selection();
+        onTap();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -91,11 +98,30 @@ class ClubCard extends StatelessWidget {
                 ),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
               ),
-              child: Center(
-                child: Text(
-                  club.category.icon,
-                  style: TextStyle(fontSize: 40),
-                ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Icon(
+                      club.category.iconData,
+                      size: 40,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  // Favorite button
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: ListenableBuilder(
+                      listenable: FavoritesService.instance,
+                      builder: (context, _) => FavoriteButton(
+                        isFavorite: FavoritesService.instance.isClubFavorite(club.id),
+                        onToggle: () => FavoritesService.instance.toggleClubFavorite(club.id),
+                        size: 20,
+                        activeColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             
@@ -217,19 +243,47 @@ class MemberButton extends StatelessWidget {
 
     return Consumer<MockDataService>(
       builder: (context, dataService, _) {
+        // Check if user already has a pending request
+        final user = MockUserService.currentUser;
+        final pendingRequest = dataService.getMyJoinRequests(user.uid)
+            .where((r) => r.clubId == club.id && r.isPending)
+            .isNotEmpty;
+
+        if (pendingRequest) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.warning),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.hourglass_empty, size: 14, color: AppColors.warning),
+                const SizedBox(width: 4),
+                Text(
+                  'Pending',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.warning,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         return GestureDetector(
           onTap: () {
-            final user = MockUserService.currentUser;
-            final updatedClub = club.copyWith(
-              memberIds: [...club.memberIds, user.uid],
-            );
-            dataService.updateClub(updatedClub);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Joined ${club.name}!'),
-                backgroundColor: AppColors.success,
-              ),
-            );
+            if (!club.isApproved) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('This club is pending approval')),
+              );
+              return;
+            }
+            _showJoinRequestDialog(context, dataService, user.uid);
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -238,7 +292,7 @@ class MemberButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
-              'Join',
+              'Request to Join',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -250,6 +304,59 @@ class MemberButton extends StatelessWidget {
       },
     );
   }
+
+  void _showJoinRequestDialog(BuildContext context, MockDataService dataService, String userId) {
+    final noteController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Join ${club.name}?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Send a request to the club admins to join.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: noteController,
+              decoration: const InputDecoration(
+                labelText: 'Note (Optional)',
+                hintText: 'Why do you want to join?',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              dataService.requestToJoinClub(
+                clubId: club.id,
+                clubName: club.name,
+                userId: userId,
+                userName: 'Current User', // Mock user name
+                note: noteController.text,
+              );
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Join request sent successfully!'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            child: const Text('Send Request'),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 
 /// Club Stat Widget
@@ -312,6 +419,8 @@ class ContactRow extends StatelessWidget {
   }
 }
 
+// ... (existing code)
+
 /// Post Card - Displays club post
 class PostCard extends StatelessWidget {
   final ClubPost post;
@@ -355,6 +464,26 @@ class PostCard extends StatelessWidget {
                   color: context.appColors.textTertiary,
                 ),
               ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, size: 20, color: context.appColors.textTertiary),
+                onSelected: (value) {
+                  if (value == 'report') {
+                    _showReportDialog(context);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'report',
+                    child: Row(
+                      children: [
+                        Icon(Icons.flag_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Report'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -377,11 +506,99 @@ class PostCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          if (post.type == ClubPostType.recruitment) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Application feature coming soon! (Mock)')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.clubsColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Apply Now'),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+
+  void _showReportDialog(BuildContext context) {
+    final reasonController = TextEditingController();
+    ReportReason selectedReason = ReportReason.spam;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Report Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<ReportReason>(
+                initialValue: selectedReason,
+                items: ReportReason.values.map((r) => DropdownMenuItem(
+                  value: r,
+                  child: Text(r.name.toUpperCase()),
+                )).toList(),
+                onChanged: (v) => setState(() => selectedReason = v!),
+                decoration: const InputDecoration(labelText: 'Reason'),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Details (optional)',
+                  hintText: 'Describe the issue...',
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final user = MockUserService.currentUser;
+                final report = Report(
+                  id: 'r_${DateTime.now().millisecondsSinceEpoch}',
+                  targetId: post.id,
+                  type: ReportType.clubPost,
+                  reason: selectedReason,
+                  description: reasonController.text,
+                  reporterId: user.uid,
+                  timestamp: DateTime.now(),
+                  targetTitle: post.title,
+                  targetPreview: post.content,
+                );
+                
+                context.read<MockDataService>().addReport(report);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Report submitted. Thank you!')),
+                );
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
 
 /// Empty State - Full page empty state
 class ClubEmptyState extends StatelessWidget {

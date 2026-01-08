@@ -512,26 +512,60 @@ class _ConnectButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = MockUserService.currentUser;
+    final hasConnection = context.watch<MockDataService>().hasStudyConnection(request.id, user.uid);
+    
+    if (hasConnection) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.success),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check, size: 14, color: AppColors.success),
+            const SizedBox(width: 4),
+            Text(
+              'Connected',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.success,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (ctx) => AlertDialog(
             title: const Text('Connect Request'),
             content: Text(
-              'Send a study request to ${request.userName} for ${request.topic}?',
+              'Connect with ${request.userName} to study ${request.topic}?',
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(ctx),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context);
+                  Navigator.pop(ctx);
+                  context.read<MockDataService>().connectStudyBuddy(
+                    request.id,
+                    user.uid,
+                    user.name,
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Request sent to ${request.userName}!'),
+                      content: Text('Connected with ${request.userName}!'),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -539,7 +573,7 @@ class _ConnectButton extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.studyBuddyColor,
                 ),
-                child: const Text('Send Request'),
+                child: const Text('Connect'),
               ),
             ],
           ),

@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../core/constants/app_constants.dart';
 
 /// User model representing a student, club admin, council member, or faculty
@@ -16,6 +16,9 @@ class AppUser {
   final String? profilePhotoUrl;
   final String? bio;
   final String? phoneNumber;
+  final String? backgroundType; // 'color', 'gradient', or 'image'
+  final int? backgroundColorValue; // Color value for solid/gradient
+  final String? backgroundImageUrl; // URL for image backgrounds
   final bool isVerified;
   final DateTime createdAt;
   final DateTime? lastActiveAt;
@@ -34,16 +37,18 @@ class AppUser {
     this.profilePhotoUrl,
     this.bio,
     this.phoneNumber,
+    this.backgroundType,
+    this.backgroundColorValue,
+    this.backgroundImageUrl,
     this.isVerified = false,
     required this.createdAt,
     this.lastActiveAt,
   });
 
   /// Create from Firestore document
-  factory AppUser.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory AppUser.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return AppUser(
-      uid: doc.id,
+      uid: id ?? data['id'] ?? '',
       email: data['email'] ?? '',
       name: data['name'] ?? '',
       rollNumber: data['rollNumber'] ?? '',
@@ -60,8 +65,8 @@ class AppUser {
       bio: data['bio'],
       phoneNumber: data['phoneNumber'],
       isVerified: data['isVerified'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastActiveAt: (data['lastActiveAt'] as Timestamp?)?.toDate(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
+      lastActiveAt: data['lastActiveAt'] != null ? DateTime.parse(data['lastActiveAt']) : null,
     );
   }
 
@@ -80,9 +85,12 @@ class AppUser {
       'profilePhotoUrl': profilePhotoUrl,
       'bio': bio,
       'phoneNumber': phoneNumber,
+      'backgroundType': backgroundType,
+      'backgroundColorValue': backgroundColorValue,
+      'backgroundImageUrl': backgroundImageUrl,
       'isVerified': isVerified,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'lastActiveAt': lastActiveAt != null ? Timestamp.fromDate(lastActiveAt!) : null,
+      'createdAt': createdAt.toIso8601String(),
+      'lastActiveAt': lastActiveAt?.toIso8601String(),
     };
   }
 
@@ -101,6 +109,9 @@ class AppUser {
     String? profilePhotoUrl,
     String? bio,
     String? phoneNumber,
+    String? backgroundType,
+    int? backgroundColorValue,
+    String? backgroundImageUrl,
     bool? isVerified,
     DateTime? createdAt,
     DateTime? lastActiveAt,
@@ -119,6 +130,9 @@ class AppUser {
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
       bio: bio ?? this.bio,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      backgroundType: backgroundType ?? this.backgroundType,
+      backgroundColorValue: backgroundColorValue ?? this.backgroundColorValue,
+      backgroundImageUrl: backgroundImageUrl ?? this.backgroundImageUrl,
       isVerified: isVerified ?? this.isVerified,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
@@ -145,7 +159,7 @@ class AppUser {
   /// Test user for development (before auth is implemented)
   static AppUser testStudent({String? name, UserRole? role}) => AppUser(
     uid: 'test_student_001',
-    email: 'student@mvgr.edu.in',
+    email: 'student@mvgrce.edu.in',
     name: name ?? 'Test Student',
     rollNumber: '21BCE7100',
     department: 'Computer Science',

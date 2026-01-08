@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/helpers.dart';
 import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
 import '../models/forum_model.dart';
+import '../../council/models/report_model.dart';
 
 /// Premium Discussion Forum Screen - Q&A Focused
 class AcademicForumScreen extends StatefulWidget {
@@ -171,12 +173,26 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
       false;
 }
 
-/// Questions List
-class _QuestionsList extends StatelessWidget {
+/// Questions List with Search
+class _QuestionsList extends StatefulWidget {
   final String filter;
   final String? selectedSubject;
 
   const _QuestionsList({required this.filter, this.selectedSubject});
+
+  @override
+  State<_QuestionsList> createState() => _QuestionsListState();
+}
+
+class _QuestionsListState extends State<_QuestionsList> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -184,35 +200,86 @@ class _QuestionsList extends StatelessWidget {
       builder: (context, dataService, _) {
         var questions = dataService.questions.toList();
 
-        if (filter == 'unanswered') {
+        if (widget.filter == 'unanswered') {
           questions = questions.where((q) => q.answerCount == 0).toList();
         }
 
-        if (selectedSubject != null) {
+        if (widget.selectedSubject != null) {
           questions = questions
-              .where((q) => q.subject == selectedSubject)
+              .where((q) => q.subject == widget.selectedSubject)
               .toList();
+        }
+
+        // Filter by search query
+        if (_searchQuery.isNotEmpty) {
+          questions = questions.where((q) =>
+              q.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              q.content.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
         }
 
         // Sort by recent
         questions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-        if (questions.isEmpty) {
-          return _EmptyState(
-            icon: Icons.forum_outlined,
-            title: filter == 'unanswered'
-                ? 'All questions answered!'
-                : 'No questions yet',
-            subtitle: 'Be the first to ask a question',
-          );
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: questions.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) =>
-              _QuestionCard(question: questions[index]),
+        return Column(
+          children: [
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Search questions...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: context.appColors.inputBackground,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+            ),
+            // Questions list
+            Expanded(
+              child: questions.isEmpty
+                  ? _EmptyState(
+                      icon: Icons.forum_outlined,
+                      title: _searchQuery.isNotEmpty
+                          ? 'No matching questions'
+                          : widget.filter == 'unanswered'
+                              ? 'All questions answered!'
+                              : 'No questions yet',
+                      subtitle: _searchQuery.isNotEmpty
+                          ? 'Try different search terms'
+                          : 'Be the first to ask a question',
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        HapticUtils.pullToRefresh();
+                        await Future.delayed(const Duration(milliseconds: 500));
+                      },
+                      color: AppColors.forumColor,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: questions.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) =>
+                            _QuestionCard(question: questions[index]),
+                      ),
+                    ),
+            ),
+          ],
         );
       },
     );
@@ -346,6 +413,27 @@ class _QuestionCard extends StatelessWidget {
                       color: context.appColors.textTertiary,
                     ),
                   ),
+                  const SizedBox(width: 4),
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, size: 16, color: context.appColors.textTertiary),
+                    onSelected: (value) {
+                      if (value == 'report') {
+                        _showReportDialog(context, question);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'report',
+                        child: Row(
+                          children: [
+                            Icon(Icons.flag_outlined, size: 16),
+                            SizedBox(width: 8),
+                            Text('Report', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -460,6 +548,72 @@ class _QuestionCard extends StatelessWidget {
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${time.day}/${time.month}';
   }
+
+  void _showReportDialog(BuildContext context, AcademicQuestion question) {
+    final reasonController = TextEditingController();
+    ReportReason selectedReason = ReportReason.inappropriate;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Report Question'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<ReportReason>(
+                initialValue: selectedReason,
+                items: ReportReason.values.map((r) => DropdownMenuItem(
+                  value: r,
+                  child: Text(r.name.toUpperCase()),
+                )).toList(),
+                onChanged: (v) => setState(() => selectedReason = v!),
+                decoration: const InputDecoration(labelText: 'Reason'),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Details (optional)',
+                  hintText: 'Describe the issue...',
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final user = MockUserService.currentUser;
+                final report = Report(
+                  id: 'r_${DateTime.now().millisecondsSinceEpoch}',
+                  targetId: question.id,
+                  type: ReportType.forumQuestion,
+                  reason: selectedReason,
+                  description: reasonController.text,
+                  reporterId: user.uid,
+                  timestamp: DateTime.now(),
+                  targetTitle: question.title,
+                  targetPreview: question.content,
+                );
+                
+                context.read<MockDataService>().addReport(report);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Report submitted for review')),
+                );
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Question Detail Screen
@@ -474,6 +628,29 @@ class _QuestionDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Question'),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        actions: [
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: context.appColors.textPrimary),
+            onSelected: (value) {
+              if (value == 'report') {
+                _showReportDialog(context, question);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'report',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Report Question'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Consumer<MockDataService>(
         builder: (context, dataService, _) {
@@ -652,6 +829,72 @@ class _QuestionDetailScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _AnswerSheet(questionId: question.id),
+    );
+  }
+
+  void _showReportDialog(BuildContext context, AcademicQuestion question) {
+    final reasonController = TextEditingController();
+    ReportReason selectedReason = ReportReason.inappropriate;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Report Question'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<ReportReason>(
+                initialValue: selectedReason,
+                items: ReportReason.values.map((r) => DropdownMenuItem(
+                  value: r,
+                  child: Text(r.name.toUpperCase()),
+                )).toList(),
+                onChanged: (v) => setState(() => selectedReason = v!),
+                decoration: const InputDecoration(labelText: 'Reason'),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Details (optional)',
+                  hintText: 'Describe the issue...',
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final user = MockUserService.currentUser;
+                final report = Report(
+                  id: 'r_${DateTime.now().millisecondsSinceEpoch}',
+                  targetId: question.id,
+                  type: ReportType.forumQuestion,
+                  reason: selectedReason,
+                  description: reasonController.text,
+                  reporterId: user.uid,
+                  timestamp: DateTime.now(),
+                  targetTitle: question.title,
+                  targetPreview: question.content,
+                );
+                
+                context.read<MockDataService>().addReport(report);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Report submitted for review')),
+                );
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

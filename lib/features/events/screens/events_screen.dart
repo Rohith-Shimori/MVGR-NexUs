@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/helpers.dart';
 import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
 import '../models/event_model.dart';
+import '../../council/models/report_model.dart';
 
 /// Premium Events Screen - Clean and Easy RSVP
 class EventsScreen extends StatefulWidget {
@@ -262,11 +264,18 @@ class _EventsList extends StatelessWidget {
           );
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: events.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
-          itemBuilder: (context, index) => _EventCard(event: events[index]),
+        return RefreshIndicator(
+          onRefresh: () async {
+            HapticUtils.pullToRefresh();
+            await Future.delayed(const Duration(milliseconds: 500));
+          },
+          color: AppColors.eventsColor,
+          child: ListView.separated(
+            padding: const EdgeInsets.all(20),
+            itemCount: events.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) => _EventCard(event: events[index]),
+          ),
         );
       },
     );
@@ -592,6 +601,36 @@ class _EventDetailScreen extends StatelessWidget {
                 expandedHeight: 220,
                 pinned: true,
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                actions: [
+                   PopupMenuButton<String>(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'report') {
+                        _showReportDialog(context, currentEvent);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'report',
+                        child: Row(
+                          children: [
+                            Icon(Icons.flag_outlined, size: 18),
+                            SizedBox(width: 8),
+                            Text('Report Event'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: BoxDecoration(
@@ -785,6 +824,72 @@ class _EventDetailScreen extends StatelessWidget {
     final period = hour >= 12 ? 'PM' : 'AM';
     final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
     return '$displayHour:$minute $period';
+  }
+
+  void _showReportDialog(BuildContext context, Event event) {
+    final reasonController = TextEditingController();
+    ReportReason selectedReason = ReportReason.inappropriate;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Report Event'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<ReportReason>(
+                initialValue: selectedReason,
+                items: ReportReason.values.map((r) => DropdownMenuItem(
+                  value: r,
+                  child: Text(r.name.toUpperCase()),
+                )).toList(),
+                onChanged: (v) => setState(() => selectedReason = v!),
+                decoration: const InputDecoration(labelText: 'Reason'),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Details (optional)',
+                  hintText: 'Describe the issue...',
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final user = MockUserService.currentUser;
+                final report = Report(
+                  id: 'r_${DateTime.now().millisecondsSinceEpoch}',
+                  targetId: event.id,
+                  type: ReportType.event,
+                  reason: selectedReason,
+                  description: reasonController.text,
+                  reporterId: user.uid,
+                  timestamp: DateTime.now(),
+                  targetTitle: event.title,
+                  targetPreview: event.description,
+                );
+                
+                context.read<MockDataService>().addReport(report);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Report submitted for review')),
+                );
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -1098,6 +1203,7 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
         eventDate: DateTime(_date.year, _date.month, _date.day, _startTime.hour, _startTime.minute),
         venue: _venueController.text,
         createdAt: DateTime.now(),
+        rsvpIds: [], // Initialize with empty list
       );
       
       if (!mounted) return;

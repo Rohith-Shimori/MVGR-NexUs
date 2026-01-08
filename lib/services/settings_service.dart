@@ -484,13 +484,11 @@ class AnalyticsService {
 
   void logScreenView(String screenName) {
     if (!isEnabled) return;
-    // TODO: Log to analytics
     debugPrint('[Analytics] Screen: $screenName');
   }
 
   void logEvent(String eventName, [Map<String, dynamic>? parameters]) {
     if (!isEnabled) return;
-    // TODO: Log to analytics
     debugPrint('[Analytics] Event: $eventName ${parameters ?? ''}');
   }
 

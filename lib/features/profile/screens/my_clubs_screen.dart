@@ -168,7 +168,7 @@ class _ClubTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Center(
-            child: Text(club.category.icon, style: const TextStyle(fontSize: 24)),
+            child: Icon(club.category.iconData, size: 24, color: AppColors.clubsColor),
           ),
         ),
         title: Row(

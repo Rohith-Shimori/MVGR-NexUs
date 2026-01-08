@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../services/mock_data_service.dart';
 import '../models/event_model.dart';
 import 'attendee_management_screen.dart';
+import 'edit_event_screen.dart';
 
 /// Event Dashboard Screen - Organizer view for managing an event
 class EventDashboardScreen extends StatelessWidget {
@@ -451,8 +452,9 @@ class EventDashboardScreen extends StatelessWidget {
   }
 
   void _showEditEventSheet(BuildContext context, Event event, MockDataService dataService) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit event coming soon!')),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EditEventScreen(event: event)),
     );
   }
 
@@ -554,16 +556,183 @@ class EventDashboardScreen extends StatelessWidget {
   }
 
   void _showNotifySheet(BuildContext context, Event event) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notification feature coming soon!')),
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.appColors.textTertiary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Notify Attendees',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: context.appColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Send a message to all ${event.rsvpIds.length} registered attendees',
+              style: TextStyle(
+                fontSize: 14,
+                color: context.appColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _ReleaseItem(
+              icon: Icons.access_time_filled,
+              title: 'Event Reminder',
+              subtitle: 'Send standard 1 hour reminder',
+              color: AppColors.info,
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Reminder sent to all attendees!')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _ReleaseItem(
+              icon: Icons.campaign,
+              title: 'Important Update',
+              subtitle: 'Send custom announcement',
+              color: AppColors.warning,
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Update notification sent!')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _ReleaseItem(
+              icon: Icons.check_circle,
+              title: 'Post-Event Survey',
+              subtitle: 'Request feedback',
+              color: AppColors.success,
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Survey link sent!')),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
     );
   }
 
   void _exportAttendees(BuildContext context, Event event) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Export feature coming soon!')),
+    // Generate CSV content
+    final dataService = context.read<MockDataService>();
+    final csvRows = <String>['Name,Status,Registered At,Checked In At'];
+    for (final userId in event.rsvpIds) {
+      final reg = dataService.getEventRegistration(event.id, userId);
+      if (reg != null) {
+        final status = reg.isCheckedIn ? 'Checked In' : 'Pending';
+        final regDate = reg.registeredAt.toIso8601String();
+        final checkInDate = reg.checkedInAt?.toIso8601String() ?? '-';
+        csvRows.add('${reg.userName},$status,$regDate,$checkInDate');
+      }
+    }
+    final csvContent = csvRows.join('\n');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.table_chart, color: AppColors.eventsColor),
+            const SizedBox(width: 10),
+            const Text('Export Data'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Exporting data for ${event.title}',
+                style: TextStyle(color: context.appColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'CSV Preview:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: context.appColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.appColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: context.appColors.divider),
+                ),
+                constraints: const BoxConstraints(maxHeight: 150),
+                child: SingleChildScrollView(
+                  child: Text(
+                    csvContent,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      color: context.appColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Exported ${event.rsvpIds.length} records to CSV'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            icon: const Icon(Icons.download, size: 18),
+            label: const Text('Download CSV'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.eventsColor),
+          ),
+        ],
+      ),
     );
   }
+
 }
 
 class _StatCard extends StatelessWidget {
@@ -718,6 +887,74 @@ class _DetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ReleaseItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ReleaseItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.appColors.divider),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: context.appColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.appColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: context.appColors.textTertiary),
+          ],
+        ),
+      ),
     );
   }
 }

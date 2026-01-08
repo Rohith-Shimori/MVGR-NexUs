@@ -12,16 +12,200 @@ import '../features/offline_community/models/meetup_model.dart';
 import '../features/radio/models/radio_model.dart';
 import '../models/join_request_model.dart';
 import '../models/event_registration_model.dart';
+import '../features/council/models/report_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
+import 'realtime_service.dart';
 
 /// Mock data service for testing before Firebase integration
 /// Provides in-memory CRUD operations with test data
+/// Can also load real data from Supabase via loadFromSupabase()
+/// Supports realtime updates via subscribeToRealtimeUpdates()
 class MockDataService extends ChangeNotifier {
+  bool _loadedFromSupabase = false;
+  bool get isUsingSupabase => _loadedFromSupabase;
+  
   // ============ CLUBS ============
-  final List<Club> _clubs = List.from(Club.testClubs);
+  final List<Club> _clubs = [];  // Populated from Supabase
   final List<ClubPost> _clubPosts = [];
 
   List<Club> get clubs => List.unmodifiable(_clubs.where((c) => c.isApproved));
   List<Club> get allClubs => List.unmodifiable(_clubs);
+  
+  /// Load real data from Supabase (call once at app startup)
+  Future<void> loadFromSupabase() async {
+    if (!SupabaseConfig.isInitialized) return;
+    
+    try {
+      debugPrint('🔄 Loading data from Supabase...');
+      
+      // Load clubs
+      final clubsResponse = await Supabase.instance.client
+          .from('clubs')
+          .select()
+          .order('created_at', ascending: false);
+      
+      _clubs.clear();
+      for (final json in clubsResponse as List) {
+        _clubs.add(_clubFromJson(json));
+      }
+      
+      // Load events
+      final eventsResponse = await Supabase.instance.client
+          .from('events')
+          .select()
+          .order('event_date', ascending: true);
+      
+      _events.clear();
+      for (final json in eventsResponse as List) {
+        _events.add(_eventFromJson(json));
+      }
+      
+      // Load announcements
+      final announcementsResponse = await Supabase.instance.client
+          .from('announcements')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(20);
+      
+      _announcements.clear();
+      for (final json in announcementsResponse as List) {
+        _announcements.add(_announcementFromJson(json));
+      }
+      
+      _loadedFromSupabase = true;
+      debugPrint('✅ Loaded from Supabase: ${_clubs.length} clubs, ${_events.length} events, ${_announcements.length} announcements');
+      notifyListeners();
+      
+      // Auto-subscribe to realtime after loading
+      subscribeToRealtimeUpdates();
+    } catch (e) {
+      debugPrint('❌ Failed to load from Supabase: $e');
+      // Keep using mock data
+    }
+  }
+  
+  /// Subscribe to realtime updates from Supabase
+  void subscribeToRealtimeUpdates() {
+    if (!SupabaseConfig.isInitialized) return;
+    
+    debugPrint('📡 Setting up realtime subscriptions...');
+    
+    // Subscribe to club changes
+    realtimeService.subscribeToClubs(
+      onChange: (club, type) {
+        switch (type) {
+          case RealtimeChangeType.insert:
+            _clubs.add(club);
+            debugPrint('➕ Club added: ${club.name}');
+            break;
+          case RealtimeChangeType.update:
+            final index = _clubs.indexWhere((c) => c.id == club.id);
+            if (index != -1) {
+              _clubs[index] = club;
+              debugPrint('✏️ Club updated: ${club.name}');
+            }
+            break;
+          case RealtimeChangeType.delete:
+            _clubs.removeWhere((c) => c.id == club.id);
+            debugPrint('🗑️ Club deleted: ${club.name}');
+            break;
+        }
+        notifyListeners();
+      },
+    );
+    
+    // Subscribe to event changes
+    realtimeService.subscribeToEvents(
+      onChange: (event, type) {
+        switch (type) {
+          case RealtimeChangeType.insert:
+            _events.add(event);
+            debugPrint('➕ Event added: ${event.title}');
+            break;
+          case RealtimeChangeType.update:
+            final index = _events.indexWhere((e) => e.id == event.id);
+            if (index != -1) {
+              _events[index] = event;
+              debugPrint('✏️ Event updated: ${event.title}');
+            }
+            break;
+          case RealtimeChangeType.delete:
+            _events.removeWhere((e) => e.id == event.id);
+            debugPrint('🗑️ Event deleted: ${event.title}');
+            break;
+        }
+        notifyListeners();
+      },
+    );
+    
+    debugPrint('✅ Realtime subscriptions active!');
+  }
+  
+  // JSON converters for Supabase data
+  Club _clubFromJson(Map<String, dynamic> json) {
+    return Club(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      category: ClubCategory.values.firstWhere(
+        (c) => c.name == json['category'],
+        orElse: () => ClubCategory.other,
+      ),
+      adminIds: [],
+      memberIds: [],
+      logoUrl: json['logo_url']?.toString(),
+      coverImageUrl: json['cover_image_url']?.toString(),
+      contactEmail: json['contact_email']?.toString(),
+      instagramHandle: json['instagram_handle']?.toString(),
+      isApproved: json['is_approved'] == true,
+      isOfficial: json['is_official'] == true,
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      createdBy: json['created_by']?.toString() ?? '',
+    );
+  }
+  
+  Event _eventFromJson(Map<String, dynamic> json) {
+    return Event(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      clubId: json['club_id']?.toString(),
+      clubName: json['club_name']?.toString(),
+      authorId: json['author_id']?.toString() ?? '',
+      authorName: json['author_name']?.toString() ?? '',
+      eventDate: DateTime.tryParse(json['event_date']?.toString() ?? '') ?? DateTime.now(),
+      endDate: json['end_date'] != null ? DateTime.tryParse(json['end_date'].toString()) : null,
+      venue: json['venue']?.toString() ?? '',
+      rsvpIds: [],
+      interestedIds: [],
+      category: EventCategory.values.firstWhere(
+        (c) => c.name == json['category'],
+        orElse: () => EventCategory.other,
+      ),
+      imageUrl: json['image_url']?.toString(),
+      registrationLink: json['registration_link']?.toString(),
+      requiresRegistration: json['requires_registration'] == true,
+      isOnline: json['is_online'] == true,
+      meetingLink: json['meeting_link']?.toString(),
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+  
+  Announcement _announcementFromJson(Map<String, dynamic> json) {
+    return Announcement(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      content: json['content']?.toString() ?? '',
+      authorId: json['author_id']?.toString() ?? '',
+      authorName: json['author_name']?.toString() ?? '',
+      authorRole: json['source']?.toString() ?? 'Council',
+      isPinned: json['is_pinned'] == true,
+      isUrgent: json['is_urgent'] == true,
+      expiresAt: json['expires_at'] != null ? DateTime.tryParse(json['expires_at'].toString()) : null,
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
 
   Club? getClubById(String id) {
     try {
@@ -31,17 +215,81 @@ class MockDataService extends ChangeNotifier {
     }
   }
 
-  void addClub(Club club) {
+  /// Add a new club - writes to Supabase then updates local cache
+  Future<void> addClub(Club club) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('clubs').insert({
+          'id': club.id,
+          'name': club.name,
+          'description': club.description,
+          'category': club.category.name,
+          'logo_url': club.logoUrl,
+          'cover_image_url': club.coverImageUrl,
+          'admin_ids': club.adminIds,
+          'member_ids': club.memberIds,
+          'contact_email': club.contactEmail,
+          'instagram_handle': club.instagramHandle,
+          'is_approved': club.isApproved,
+          'is_official': club.isOfficial,
+          'created_by': club.createdBy,
+          'created_at': club.createdAt.toIso8601String(),
+        });
+        debugPrint('✅ Club added to Supabase: ${club.name}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error adding club to Supabase: $e');
+    }
+    // Always update local cache
     _clubs.add(club);
     notifyListeners();
   }
 
-  void updateClub(Club club) {
+  /// Update a club - writes to Supabase then updates local cache
+  Future<void> updateClub(Club club) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('clubs').update({
+          'name': club.name,
+          'description': club.description,
+          'category': club.category.name,
+          'logo_url': club.logoUrl,
+          'cover_image_url': club.coverImageUrl,
+          'admin_ids': club.adminIds,
+          'member_ids': club.memberIds,
+          'contact_email': club.contactEmail,
+          'instagram_handle': club.instagramHandle,
+          'is_approved': club.isApproved,
+          'is_official': club.isOfficial,
+        }).eq('id', club.id);
+        debugPrint('✅ Club updated in Supabase: ${club.name}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating club in Supabase: $e');
+    }
+    // Update local cache
     final index = _clubs.indexWhere((c) => c.id == club.id);
     if (index != -1) {
       _clubs[index] = club;
       notifyListeners();
     }
+  }
+
+  /// Delete a club and all associated posts - deletes from Supabase then removes from cache
+  Future<void> deleteClub(String clubId) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('clubs').delete().eq('id', clubId);
+        debugPrint('✅ Club deleted from Supabase: $clubId');
+      }
+    } catch (e) {
+      debugPrint('❌ Error deleting club from Supabase: $e');
+    }
+    // Remove from local cache
+    _clubs.removeWhere((c) => c.id == clubId);
+    _clubPosts.removeWhere((p) => p.clubId == clubId);
+    _clubJoinRequests.removeWhere((r) => r.clubId == clubId);
+    notifyListeners();
   }
 
   List<ClubPost> getClubPosts(String clubId) =>
@@ -151,34 +399,52 @@ class MockDataService extends ChangeNotifier {
   List<Club> getAdminClubs(String userId) =>
       _clubs.where((c) => c.isAdmin(userId)).toList();
 
-  /// Leave a club
-  void leaveClub(String clubId, String userId) {
+  /// Leave a club - updates member_ids in Supabase
+  Future<void> leaveClub(String clubId, String userId) async {
     final index = _clubs.indexWhere((c) => c.id == clubId);
     if (index != -1) {
       final club = _clubs[index];
-      _clubs[index] = club.copyWith(
-        memberIds: club.memberIds.where((id) => id != userId).toList(),
-      );
+      final newMemberIds = club.memberIds.where((id) => id != userId).toList();
+      try {
+        if (SupabaseConfig.isInitialized) {
+          await Supabase.instance.client.from('clubs').update({
+            'member_ids': newMemberIds,
+          }).eq('id', clubId);
+          debugPrint('✅ User left club in Supabase: $clubId');
+        }
+      } catch (e) {
+        debugPrint('❌ Error updating membership in Supabase: $e');
+      }
+      _clubs[index] = club.copyWith(memberIds: newMemberIds);
       notifyListeners();
     }
   }
 
-  /// Join a club directly (for open clubs without approval)
-  void joinClubDirectly(String clubId, String userId) {
+  /// Join a club directly (for open clubs without approval) - updates member_ids in Supabase
+  Future<void> joinClubDirectly(String clubId, String userId) async {
     final index = _clubs.indexWhere((c) => c.id == clubId);
     if (index != -1) {
       final club = _clubs[index];
       if (!club.isMember(userId)) {
-        _clubs[index] = club.copyWith(
-          memberIds: [...club.memberIds, userId],
-        );
+        final newMemberIds = [...club.memberIds, userId];
+        try {
+          if (SupabaseConfig.isInitialized) {
+            await Supabase.instance.client.from('clubs').update({
+              'member_ids': newMemberIds,
+            }).eq('id', clubId);
+            debugPrint('✅ User joined club in Supabase: $clubId');
+          }
+        } catch (e) {
+          debugPrint('❌ Error updating membership in Supabase: $e');
+        }
+        _clubs[index] = club.copyWith(memberIds: newMemberIds);
         notifyListeners();
       }
     }
   }
 
   // ============ EVENTS ============
-  final List<Event> _events = List.from(Event.testEvents);
+  final List<Event> _events = [];  // Populated from Supabase
 
   List<Event> get events => List.unmodifiable(_events);
   List<Event> get upcomingEvents =>
@@ -196,30 +462,82 @@ class MockDataService extends ChangeNotifier {
     }
   }
 
-  void addEvent(Event event) {
+  /// Add a new event - writes to Supabase then updates local cache
+  Future<void> addEvent(Event event) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('events').insert({
+          'id': event.id,
+          'title': event.title,
+          'description': event.description,
+          'club_id': event.clubId,
+          'club_name': event.clubName,
+          'author_id': event.authorId,
+          'author_name': event.authorName,
+          'event_date': event.eventDate.toIso8601String(),
+          'end_date': event.endDate?.toIso8601String(),
+          'venue': event.venue,
+          'venue_details': event.venueDetails,
+          'max_participants': event.maxParticipants,
+          'rsvp_ids': event.rsvpIds,
+          'interested_ids': event.interestedIds,
+          'category': event.category.name,
+          'image_url': event.imageUrl,
+          'registration_link': event.registrationLink,
+          'requires_registration': event.requiresRegistration,
+          'is_online': event.isOnline,
+          'meeting_link': event.meetingLink,
+          'created_at': event.createdAt.toIso8601String(),
+        });
+        debugPrint('✅ Event added to Supabase: ${event.title}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error adding event to Supabase: $e');
+    }
     _events.add(event);
     notifyListeners();
   }
 
-  void rsvpEvent(String eventId, String userId) {
+  /// RSVP to an event - writes to Supabase then updates local cache
+  Future<void> rsvpEvent(String eventId, String userId) async {
     final index = _events.indexWhere((e) => e.id == eventId);
     if (index != -1) {
       final event = _events[index];
       if (!event.rsvpIds.contains(userId)) {
-        _events[index] = event.copyWith(rsvpIds: [...event.rsvpIds, userId]);
+        final newRsvpIds = [...event.rsvpIds, userId];
+        try {
+          if (SupabaseConfig.isInitialized) {
+            await Supabase.instance.client.from('events').update({
+              'rsvp_ids': newRsvpIds,
+            }).eq('id', eventId);
+            debugPrint('✅ RSVP added to Supabase for event: $eventId');
+          }
+        } catch (e) {
+          debugPrint('❌ Error updating RSVP in Supabase: $e');
+        }
+        _events[index] = event.copyWith(rsvpIds: newRsvpIds);
         notifyListeners();
       }
     }
   }
 
-  void removeRsvp(String eventId, String userId) {
+  /// Remove RSVP from an event - writes to Supabase then updates local cache
+  Future<void> removeRsvp(String eventId, String userId) async {
     final index = _events.indexWhere((e) => e.id == eventId);
     if (index != -1) {
       final event = _events[index];
-      _events[index] = event.copyWith(
-        rsvpIds: event.rsvpIds.where((id) => id != userId).toList(),
-      );
-      // Also remove from registrations
+      final newRsvpIds = event.rsvpIds.where((id) => id != userId).toList();
+      try {
+        if (SupabaseConfig.isInitialized) {
+          await Supabase.instance.client.from('events').update({
+            'rsvp_ids': newRsvpIds,
+          }).eq('id', eventId);
+          debugPrint('✅ RSVP removed from Supabase for event: $eventId');
+        }
+      } catch (e) {
+        debugPrint('❌ Error removing RSVP from Supabase: $e');
+      }
+      _events[index] = event.copyWith(rsvpIds: newRsvpIds);
       _eventRegistrations.removeWhere(
         (r) => r.eventId == eventId && r.userId == userId,
       );
@@ -297,8 +615,32 @@ class MockDataService extends ChangeNotifier {
     }
   }
 
-  /// Update an event
-  void updateEvent(Event event) {
+  /// Update an event - writes to Supabase then updates local cache
+  Future<void> updateEvent(Event event) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('events').update({
+          'title': event.title,
+          'description': event.description,
+          'club_id': event.clubId,
+          'club_name': event.clubName,
+          'event_date': event.eventDate.toIso8601String(),
+          'end_date': event.endDate?.toIso8601String(),
+          'venue': event.venue,
+          'venue_details': event.venueDetails,
+          'max_participants': event.maxParticipants,
+          'category': event.category.name,
+          'image_url': event.imageUrl,
+          'registration_link': event.registrationLink,
+          'requires_registration': event.requiresRegistration,
+          'is_online': event.isOnline,
+          'meeting_link': event.meetingLink,
+        }).eq('id', event.id);
+        debugPrint('✅ Event updated in Supabase: ${event.title}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating event in Supabase: $e');
+    }
     final index = _events.indexWhere((e) => e.id == event.id);
     if (index != -1) {
       _events[index] = event;
@@ -306,8 +648,16 @@ class MockDataService extends ChangeNotifier {
     }
   }
 
-  /// Delete an event
-  void deleteEvent(String eventId) {
+  /// Delete an event - deletes from Supabase then removes from cache
+  Future<void> deleteEvent(String eventId) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('events').delete().eq('id', eventId);
+        debugPrint('✅ Event deleted from Supabase: $eventId');
+      }
+    } catch (e) {
+      debugPrint('❌ Error deleting event from Supabase: $e');
+    }
     _events.removeWhere((e) => e.id == eventId);
     _eventRegistrations.removeWhere((r) => r.eventId == eventId);
     notifyListeners();
@@ -324,9 +674,7 @@ class MockDataService extends ChangeNotifier {
   }
 
   // ============ ANNOUNCEMENTS ============
-  final List<Announcement> _announcements = List.from(
-    Announcement.testAnnouncements,
-  );
+  final List<Announcement> _announcements = [];  // Populated from Supabase
 
   List<Announcement> get announcements => List.unmodifiable(_announcements);
   List<Announcement> get activeAnnouncements =>
@@ -336,8 +684,65 @@ class MockDataService extends ChangeNotifier {
         return b.createdAt.compareTo(a.createdAt);
       });
 
-  void addAnnouncement(Announcement announcement) {
+  /// Add announcement - writes to Supabase then updates local cache
+  Future<void> addAnnouncement(Announcement announcement) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('announcements').insert({
+          'id': announcement.id,
+          'title': announcement.title,
+          'content': announcement.content,
+          'author_id': announcement.authorId,
+          'author_name': announcement.authorName,
+          'source': announcement.authorRole,
+          'is_pinned': announcement.isPinned,
+          'is_urgent': announcement.isUrgent,
+          'expires_at': announcement.expiresAt?.toIso8601String(),
+          'created_at': announcement.createdAt.toIso8601String(),
+        });
+        debugPrint('✅ Announcement added to Supabase: ${announcement.title}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error adding announcement to Supabase: $e');
+    }
     _announcements.add(announcement);
+    notifyListeners();
+  }
+
+  /// Update announcement - writes to Supabase then updates local cache
+  Future<void> updateAnnouncement(Announcement announcement) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('announcements').update({
+          'title': announcement.title,
+          'content': announcement.content,
+          'is_pinned': announcement.isPinned,
+          'is_urgent': announcement.isUrgent,
+          'expires_at': announcement.expiresAt?.toIso8601String(),
+        }).eq('id', announcement.id);
+        debugPrint('✅ Announcement updated in Supabase: ${announcement.title}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating announcement in Supabase: $e');
+    }
+    final index = _announcements.indexWhere((a) => a.id == announcement.id);
+    if (index != -1) {
+      _announcements[index] = announcement;
+      notifyListeners();
+    }
+  }
+
+  /// Delete announcement - deletes from Supabase then removes from cache
+  Future<void> deleteAnnouncement(String announcementId) async {
+    try {
+      if (SupabaseConfig.isInitialized) {
+        await Supabase.instance.client.from('announcements').delete().eq('id', announcementId);
+        debugPrint('✅ Announcement deleted from Supabase: $announcementId');
+      }
+    } catch (e) {
+      debugPrint('❌ Error deleting announcement from Supabase: $e');
+    }
+    _announcements.removeWhere((a) => a.id == announcementId);
     notifyListeners();
   }
 
@@ -848,6 +1253,81 @@ class MockDataService extends ChangeNotifier {
   List<JoinRequest> getJoinRequestsForTeam(String teamId) =>
       _joinRequests.where((r) => r.teamRequestId == teamId).toList();
 
+  /// Join a team directly (adds user as member)
+  bool joinTeamRequest(String teamId, String userId, String userName) {
+    final index = _teamRequests.indexWhere((t) => t.id == teamId);
+    if (index == -1) return false;
+    
+    final team = _teamRequests[index];
+    if (team.isFull || team.isMember(userId)) return false;
+    
+    _teamRequests[index] = team.copyWith(
+      memberIds: [...team.memberIds, userId],
+      memberNames: [...team.memberNames, userName],
+      currentMembers: team.currentMembers + 1,
+      status: team.currentMembers + 1 >= team.teamSize ? 'full' : 'open',
+    );
+    notifyListeners();
+    return true;
+  }
+
+  /// Leave a team (removes user from members)
+  bool leaveTeamRequest(String teamId, String userId) {
+    final index = _teamRequests.indexWhere((t) => t.id == teamId);
+    if (index == -1) return false;
+    
+    final team = _teamRequests[index];
+    if (!team.memberIds.contains(userId)) return false;
+    
+    final memberIndex = team.memberIds.indexOf(userId);
+    final newMemberIds = List<String>.from(team.memberIds)..removeAt(memberIndex);
+    final newMemberNames = List<String>.from(team.memberNames);
+    if (memberIndex < newMemberNames.length) newMemberNames.removeAt(memberIndex);
+    
+    _teamRequests[index] = team.copyWith(
+      memberIds: newMemberIds,
+      memberNames: newMemberNames,
+      currentMembers: team.currentMembers - 1,
+      status: 'open',
+    );
+    notifyListeners();
+    return true;
+  }
+
+  /// Connect with a study buddy (creates a match)
+  void connectStudyBuddy(String requestId, String userId, String userName) {
+    // Find the request
+    final requestIndex = _studyRequests.indexWhere((r) => r.id == requestId);
+    if (requestIndex == -1) return;
+    
+    final request = _studyRequests[requestIndex];
+    
+    // Create a match using correct StudyMatch parameters
+    final match = StudyMatch(
+      id: 'match_${DateTime.now().millisecondsSinceEpoch}',
+      requestId: requestId,
+      requesterId: request.userId,
+      requesterName: request.userName,
+      matchedUserId: userId,
+      matchedUserName: userName,
+      requesterStatus: MatchStatus.accepted, // Auto-accept since they created request
+      matchedUserStatus: MatchStatus.accepted,
+      createdAt: DateTime.now(),
+    );
+    _studyMatches.add(match);
+    
+    // Update request status to matched
+    _studyRequests[requestIndex] = request.copyWith(status: RequestStatus.matched);
+    
+    notifyListeners();
+  }
+
+  /// Check if user has already connected with a study request
+  bool hasStudyConnection(String requestId, String userId) {
+    return _studyMatches.any((m) => 
+      m.requestId == requestId && (m.requesterId == userId || m.matchedUserId == userId));
+  }
+
   // ============ MENTORSHIP ============
   final List<Mentor> _mentors = List.from(Mentor.testMentors);
   final List<MentorshipRequest> _mentorshipRequests = [];
@@ -952,8 +1432,84 @@ class MockDataService extends ChangeNotifier {
   }
 
   // ============ RADIO ============
-  final List<SongVote> _songVotes = [];
-  final List<Shoutout> _shoutouts = [];
+  final List<SongVote> _songVotes = [
+    SongVote(
+      id: 'song_1',
+      sessionId: 'session_1',
+      songName: 'Telugu Song',
+      artistName: 'Local Artist',
+      requesterId: 'user_1',
+      requesterName: 'Praneeth',
+      voteCount: 15,
+      voterIds: ['user_2', 'user_3'],
+      isPlayed: false,
+      isApproved: true,
+      requestedAt: DateTime.now().subtract(const Duration(hours: 1)),
+    ),
+    SongVote(
+      id: 'song_2',
+      sessionId: 'session_1',
+      songName: 'English Song',
+      artistName: 'International Artist',
+      requesterId: 'user_2',
+      requesterName: 'Rohith',
+      voteCount: 12,
+      voterIds: ['user_1'],
+      isPlayed: false,
+      isApproved: true,
+      requestedAt: DateTime.now().subtract(const Duration(minutes: 30)),
+    ),
+    SongVote(
+      id: 'song_3',
+      sessionId: 'session_1',
+      songName: 'Pushpa OST',
+      artistName: 'Devi Sri Prasad',
+      requesterId: 'user_3',
+      requesterName: 'Sai Kumar',
+      voteCount: 8,
+      voterIds: [],
+      isPlayed: false,
+      isApproved: true,
+      requestedAt: DateTime.now().subtract(const Duration(minutes: 20)),
+    ),
+  ];
+  final List<Shoutout> _shoutouts = [
+    Shoutout(
+      id: 'shoutout_1',
+      sessionId: 'session_1',
+      authorId: 'user_1',
+      authorName: 'Praneeth',
+      message: 'Shoutout to all the MVGR students! Keep rocking! 🎉',
+      dedicatedTo: 'CSE Batch 2024',
+      isAnonymous: false,
+      status: ModerationStatus.approved,
+      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      isRead: true,
+    ),
+    Shoutout(
+      id: 'shoutout_2',
+      sessionId: 'session_1',
+      authorId: 'user_2',
+      authorName: 'Anonymous',
+      message: 'Happy birthday to my best friend! 🎂',
+      dedicatedTo: 'My BFF',
+      isAnonymous: true,
+      status: ModerationStatus.approved,
+      createdAt: DateTime.now().subtract(const Duration(minutes: 45)),
+      isRead: false,
+    ),
+    Shoutout(
+      id: 'shoutout_3',
+      sessionId: 'session_1',
+      authorId: 'user_3',
+      authorName: 'Sai Kumar',
+      message: 'AIVENGERS club is the best! Join us for amazing AI projects!',
+      isAnonymous: false,
+      status: ModerationStatus.pending,
+      createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
+      isRead: false,
+    ),
+  ];
 
   List<SongVote> get songVotes => List.unmodifiable(_songVotes);
   List<Shoutout> get shoutouts => List.unmodifiable(_shoutouts);
@@ -1010,6 +1566,90 @@ class MockDataService extends ChangeNotifier {
       );
       notifyListeners();
     }
+  }
+  // --- Reporting & Moderation ---
+
+  final List<Report> _reports = [
+    Report(
+      id: 'r1',
+      targetId: 'cp1',
+      type: ReportType.clubPost,
+      reason: ReportReason.spam,
+      description: 'Repeated spam messages about crypto',
+      reporterId: 'u2',
+      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+      targetTitle: 'Join our Club!',
+      targetPreview: 'Spam content here...',
+    ),
+    Report(
+      id: 'r2',
+      targetId: 'e2',
+      type: ReportType.event,
+      reason: ReportReason.inappropriate,
+      description: 'Event image violates guidelines',
+      reporterId: 'u3',
+      timestamp: DateTime.now().subtract(const Duration(days: 1)),
+      targetTitle: 'Night Party',
+      targetPreview: 'Inappropriate details...',
+    ),
+  ];
+
+  List<Report> get reports => _reports;
+
+  List<Report> get pendingReports => _reports.where((r) => r.status == ReportStatus.pending).toList();
+
+  void addReport(Report report) {
+    _reports.add(report);
+    notifyListeners();
+  }
+
+  void resolveReport(String reportId, String resolvedBy) {
+    final index = _reports.indexWhere((r) => r.id == reportId);
+    if (index != -1) {
+      _reports[index] = _reports[index].copyWith(
+        status: ReportStatus.resolved,
+        resolvedBy: resolvedBy,
+        resolvedAt: DateTime.now(),
+      );
+      notifyListeners();
+    }
+  }
+
+  void dismissReport(String reportId) {
+    final index = _reports.indexWhere((r) => r.id == reportId);
+    if (index != -1) {
+      _reports[index] = _reports[index].copyWith(
+        status: ReportStatus.dismissed,
+        resolvedAt: DateTime.now(),
+      );
+      notifyListeners();
+    }
+  }
+
+  void deleteContent(String targetId, ReportType type) {
+    // In a real app, this would delete the actual content from the DB.
+    // Here we'll just mock it by updating the report status or removing from lists if possible.
+    
+    // 1. Mark report as resolved (action taken)
+    final reportIndex = _reports.indexWhere((r) => r.targetId == targetId);
+    if (reportIndex != -1) {
+      _reports[reportIndex] = _reports[reportIndex].copyWith(
+        status: ReportStatus.resolved,
+        resolvedBy: 'Admin',
+        resolvedAt: DateTime.now(),
+      );
+    }
+
+    // 2. Remove actual content from mock lists
+    if (type == ReportType.clubPost) {
+      // _posts.removeWhere((p) => p.id == targetId); // If posts were global
+    } else if (type == ReportType.event) {
+      _events.removeWhere((e) => e.id == targetId);
+    } else if (type == ReportType.forumQuestion) {
+      _questions.removeWhere((q) => q.id == targetId);
+    }
+    
+    notifyListeners();
   }
 }
 

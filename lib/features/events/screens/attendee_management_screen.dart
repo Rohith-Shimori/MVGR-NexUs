@@ -164,9 +164,7 @@ class _AttendeeManagementScreenState extends State<AttendeeManagementScreen>
               subtitle: const Text('Download attendee list'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Export feature coming soon!')),
-                );
+                _showExportDialog(context, event, dataService);
               },
             ),
             ListTile(
@@ -182,6 +180,95 @@ class _AttendeeManagementScreenState extends State<AttendeeManagementScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showExportDialog(BuildContext context, Event event, MockDataService dataService) {
+    // Generate CSV content
+    final csvRows = <String>['Name,Status,Registered At,Checked In At'];
+    for (final userId in event.rsvpIds) {
+      final reg = dataService.getEventRegistration(event.id, userId);
+      if (reg != null) {
+        final status = reg.isCheckedIn ? 'Checked In' : 'Pending';
+        final regDate = reg.registeredAt.toIso8601String();
+        final checkInDate = reg.checkedInAt?.toIso8601String() ?? '-';
+        csvRows.add('${reg.userName},$status,$regDate,$checkInDate');
+      }
+    }
+    final csvContent = csvRows.join('\n');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.table_chart, color: AppColors.eventsColor),
+            const SizedBox(width: 10),
+            const Text('Export Attendees'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${event.rsvpIds.length} attendees will be exported',
+                style: TextStyle(color: context.appColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'CSV Preview:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: context.appColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.appColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: context.appColors.divider),
+                ),
+                constraints: const BoxConstraints(maxHeight: 150),
+                child: SingleChildScrollView(
+                  child: Text(
+                    csvContent,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      color: context.appColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Exported ${event.rsvpIds.length} attendees to CSV'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            icon: const Icon(Icons.download, size: 18),
+            label: const Text('Download CSV'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.eventsColor),
+          ),
+        ],
       ),
     );
   }

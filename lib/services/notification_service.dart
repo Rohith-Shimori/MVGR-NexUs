@@ -1,7 +1,11 @@
 // Notification Service - Smart Alerts & Prioritized Notifications
 // Manages notification scheduling, prioritization, and reminders
+// Now with Supabase Realtime for live push notifications
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
+import '../core/theme/app_colors.dart';
 
 /// Priority levels for notifications
 enum NotificationPriority {
@@ -101,15 +105,154 @@ class SmartNotification {
   }
 }
 
-/// Notification Service for smart alert management
-class NotificationService {
+/// Global key for showing notification snackbars app-wide
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = 
+    GlobalKey<ScaffoldMessengerState>();
+
+/// Notification Service for smart alert management with Supabase Realtime
+class NotificationService extends ChangeNotifier {
+  static final NotificationService _instance = NotificationService._internal();
+  static NotificationService get instance => _instance;
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
   final List<SmartNotification> _notifications = [];
+  RealtimeChannel? _announcementChannel;
+  RealtimeChannel? _eventChannel;
+  RealtimeChannel? _clubChannel;
+  bool _isSubscribed = false;
 
   List<SmartNotification> get all => List.unmodifiable(_notifications);
+  int get unreadCount => _notifications.where((n) => !n.isRead).length;
+  bool get hasUnread => unreadCount > 0;
+
+  /// Initialize Supabase Realtime subscriptions
+  Future<void> initializeRealtime() async {
+    if (!SupabaseConfig.isInitialized || _isSubscribed) return;
+    
+    debugPrint('🔔 Initializing NotificationService realtime...');
+    final supabase = Supabase.instance.client;
+    
+    // Subscribe to new announcements
+    _announcementChannel = supabase.channel('realtime:announcements')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'announcements',
+        callback: (payload) => _handleNewAnnouncement(payload),
+      )
+      .subscribe();
+    
+    // Subscribe to new events
+    _eventChannel = supabase.channel('realtime:events')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'events',
+        callback: (payload) => _handleNewEvent(payload),
+      )
+      .subscribe();
+    
+    // Subscribe to new clubs
+    _clubChannel = supabase.channel('realtime:clubs')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'clubs',
+        callback: (payload) => _handleNewClub(payload),
+      )
+      .subscribe();
+    
+    _isSubscribed = true;
+    debugPrint('✅ NotificationService realtime subscribed');
+  }
+
+  void _handleNewAnnouncement(PostgresChangePayload payload) {
+    final data = payload.newRecord;
+    final notification = SmartNotification(
+      id: 'notif_announcement_${DateTime.now().millisecondsSinceEpoch}',
+      title: '📢 ${data['title'] ?? 'New Announcement'}',
+      body: data['content']?.toString().substring(0, 50) ?? '',
+      category: NotificationCategory.announcement,
+      priority: data['is_urgent'] == true 
+          ? NotificationPriority.urgent 
+          : NotificationPriority.high,
+      createdAt: DateTime.now(),
+    );
+    _addAndNotify(notification);
+  }
+
+  void _handleNewEvent(PostgresChangePayload payload) {
+    final data = payload.newRecord;
+    final notification = SmartNotification(
+      id: 'notif_event_${DateTime.now().millisecondsSinceEpoch}',
+      title: '🎉 New Event: ${data['title'] ?? 'Event'}',
+      body: data['venue']?.toString() ?? '',
+      category: NotificationCategory.event,
+      priority: NotificationPriority.normal,
+      createdAt: DateTime.now(),
+    );
+    _addAndNotify(notification);
+  }
+
+  void _handleNewClub(PostgresChangePayload payload) {
+    final data = payload.newRecord;
+    final notification = SmartNotification(
+      id: 'notif_club_${DateTime.now().millisecondsSinceEpoch}',
+      title: '🏛️ New Club Created',
+      body: '${data['name']} is now on campus!',
+      category: NotificationCategory.club,
+      priority: NotificationPriority.low,
+      createdAt: DateTime.now(),
+    );
+    _addAndNotify(notification);
+  }
+
+  void _addAndNotify(SmartNotification notification) {
+    _notifications.insert(0, notification);
+    notifyListeners();
+    _showSnackbar(notification);
+    debugPrint('🔔 New notification: ${notification.title}');
+  }
+
+  void _showSnackbar(SmartNotification notification) {
+    final messenger = rootScaffoldMessengerKey.currentState;
+    if (messenger != null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                notification.category == NotificationCategory.announcement
+                    ? Icons.campaign
+                    : notification.category == NotificationCategory.event
+                        ? Icons.event
+                        : Icons.groups,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(notification.title),
+              ),
+            ],
+          ),
+          backgroundColor: notification.priority == NotificationPriority.urgent
+              ? AppColors.error
+              : notification.priority == NotificationPriority.high
+                  ? AppColors.warning
+                  : AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
 
   /// Add a new notification
   void addNotification(SmartNotification notification) {
-    _notifications.add(notification);
+    _notifications.insert(0, notification);
+    notifyListeners();
   }
 
   /// Get prioritized notifications for a user

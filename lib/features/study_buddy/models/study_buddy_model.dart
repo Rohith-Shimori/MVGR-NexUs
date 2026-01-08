@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Preferred study mode
 enum StudyMode {
@@ -95,10 +95,9 @@ class StudyRequest {
     required this.expiresAt,
   });
 
-  factory StudyRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory StudyRequest.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return StudyRequest(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
       subject: data['subject'] ?? '',
@@ -115,9 +114,8 @@ class StudyRequest {
         (s) => s.name == data['status'],
         orElse: () => RequestStatus.active,
       ),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      expiresAt: (data['expiresAt'] as Timestamp?)?.toDate() ?? 
-          DateTime.now().add(const Duration(days: 14)),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
+      expiresAt: data['expiresAt'] != null ? DateTime.parse(data['expiresAt']) : DateTime.now().add(const Duration(days: 14)),
     );
   }
 
@@ -133,8 +131,8 @@ class StudyRequest {
       'availableDays': availableDays,
       'preferredTime': preferredTime,
       'status': status.name,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'expiresAt': Timestamp.fromDate(expiresAt),
+      'createdAt': createdAt.toIso8601String(),
+      'expiresAt': expiresAt.toIso8601String(),
     };
   }
 
@@ -256,10 +254,9 @@ class StudyMatch {
     required this.createdAt,
   });
 
-  factory StudyMatch.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory StudyMatch.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return StudyMatch(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       requestId: data['requestId'] ?? '',
       requesterId: data['requesterId'] ?? '',
       requesterName: data['requesterName'] ?? '',
@@ -277,7 +274,7 @@ class StudyMatch {
       contactRevealed: data['contactRevealed'] ?? false,
       requesterContact: data['requesterContact'],
       matchedUserContact: data['matchedUserContact'],
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
     );
   }
 
@@ -294,7 +291,7 @@ class StudyMatch {
       'contactRevealed': contactRevealed,
       'requesterContact': requesterContact,
       'matchedUserContact': matchedUserContact,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 

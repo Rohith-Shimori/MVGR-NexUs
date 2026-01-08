@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../services/user_service.dart';
 import '../../../services/settings_service.dart';
+import 'tutorials_screen.dart';
 
 /// Premium Help & Support Screen
 class HelpSupportScreen extends StatelessWidget {
@@ -240,8 +241,173 @@ class _QuickActionsCard extends StatelessWidget {
                   icon: Icons.chat_bubble_outline,
                   label: 'Live Chat',
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Live chat coming soon!')),
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => Container(
+                        height: MediaQuery.of(context).size.height * 0.8,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        child: Column(
+                          children: [
+                            // Header
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: isDark ? AppColors.dividerDark : context.appColors.divider,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: AppColors.primary,
+                                    child: const Icon(Icons.support_agent, color: Colors.white),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Support Agent',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? AppColors.textPrimaryDark : context.appColors.textPrimary,
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.success,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Online',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.success,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    icon: Icon(Icons.close, color: isDark ? AppColors.textTertiaryDark : context.appColors.textTertiary),
+                                    onPressed: () => Navigator.pop(context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Chat Area
+                            Expanded(
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline,
+                                      size: 48,
+                                      color: isDark ? AppColors.textTertiaryDark.withValues(alpha: 0.5) : context.appColors.textTertiary.withValues(alpha: 0.5),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Start a conversation',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? AppColors.textSecondaryDark : context.appColors.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Our team typically replies in a few minutes',
+                                      style: TextStyle(
+                                        color: isDark ? AppColors.textTertiaryDark : context.appColors.textTertiary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    // Predefined options
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      alignment: WrapAlignment.center,
+                                      children: [
+                                        _DetailChip(
+                                          label: 'Login Issues',
+                                          onTap: () {},
+                                          isDark: isDark,
+                                          color: AppColors.primary,
+                                        ),
+                                        _DetailChip(
+                                          label: 'App Bugs',
+                                          onTap: () {},
+                                          isDark: isDark,
+                                          color: AppColors.primary,
+                                        ),
+                                        _DetailChip(
+                                          label: 'General Inquiry',
+                                          onTap: () {},
+                                          isDark: isDark,
+                                          color: AppColors.primary,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Input Area
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(
+                                    color: isDark ? AppColors.dividerDark : context.appColors.divider,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      decoration: InputDecoration(
+                                        hintText: 'Type a message...',
+                                        filled: true,
+                                        fillColor: Theme.of(context).cardColor,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(24),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  CircleAvatar(
+                                    backgroundColor: AppColors.primary,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                                      onPressed: () {},
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -252,8 +418,9 @@ class _QuickActionsCard extends StatelessWidget {
                   icon: Icons.video_library_outlined,
                   label: 'Tutorials',
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Tutorials coming soon!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TutorialsScreen()),
                     );
                   },
                 ),
@@ -587,6 +754,43 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
             ),
             const SizedBox(height: 16),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool isDark;
+  final Color color;
+
+  const _DetailChip({
+    required this.label,
+    required this.onTap,
+    required this.isDark,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: color,
+          ),
         ),
       ),
     );

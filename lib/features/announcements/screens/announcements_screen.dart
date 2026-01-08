@@ -5,9 +5,23 @@ import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
 import '../../events/models/event_model.dart';
 
-/// Premium Announcements Screen
-class AnnouncementsScreen extends StatelessWidget {
+/// Premium Announcements Screen with Search
+class AnnouncementsScreen extends StatefulWidget {
   const AnnouncementsScreen({super.key});
+
+  @override
+  State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
+}
+
+class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,10 +108,48 @@ class AnnouncementsScreen extends StatelessWidget {
             ),
           ),
 
+          // Search bar
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Search announcements...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Theme.of(context).cardColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+            ),
+          ),
+
           // Announcements List
           Consumer<MockDataService>(
             builder: (context, dataService, _) {
-              final announcements = dataService.announcements.toList();
+              var announcements = dataService.announcements.toList();
+              
+              // Filter by search query
+              if (_searchQuery.isNotEmpty) {
+                announcements = announcements.where((a) =>
+                    a.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                    a.content.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+              }
               
               // Sort: pinned first, then by date
               announcements.sort((a, b) {
@@ -108,12 +160,29 @@ class AnnouncementsScreen extends StatelessWidget {
 
               if (announcements.isEmpty) {
                 return SliverFillRemaining(
-                  child: _EmptyState(),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.campaign_outlined, size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchQuery.isNotEmpty ? 'No matching announcements' : 'No announcements yet',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _searchQuery.isNotEmpty ? 'Try different search terms' : 'Check back for updates',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               }
 
               return SliverPadding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => Padding(
@@ -368,42 +437,6 @@ class _AnnouncementCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}';
-  }
-}
-
-/// Empty State
-class _EmptyState extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.campaign_outlined, size: 64, color: context.appColors.textTertiary),
-            const SizedBox(height: 16),
-            Text(
-              'No announcements',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: context.appColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Check back later for updates',
-              style: TextStyle(
-                fontSize: 14,
-                color: context.appColors.textTertiary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

@@ -1,3 +1,4 @@
+import '../models/report_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -52,7 +53,8 @@ class _ContentModerationScreenState extends State<ContentModerationScreen>
       body: Consumer<MockDataService>(
         builder: (context, dataService, _) {
           final pendingClubs = dataService.allClubs.where((c) => !c.isApproved).toList();
-          final pendingEvents = dataService.events.where((e) => !e.isPast).toList();
+          final pendingEvents = dataService.events.where((e) => !e.isPast).toList(); // In real app, check isApproved
+          final pendingReports = dataService.pendingReports;
 
           return TabBarView(
             controller: _tabController,
@@ -64,10 +66,16 @@ class _ContentModerationScreenState extends State<ContentModerationScreen>
               ),
               
               // Flagged Content Tab
-              _FlaggedContentTab(),
+              _FlaggedContentTab(
+                reports: pendingReports,
+                dataService: dataService,
+              ),
               
-              // Events Tab
-              _EventsTab(events: pendingEvents),
+              // Events Tab (Mocking pending approval by showing all future events for now)
+              _EventsTab(
+                events: pendingEvents,
+                dataService: dataService,
+              ),
             ],
           );
         },
@@ -112,13 +120,18 @@ class _ClubApprovalTab extends StatelessWidget {
               SnackBar(content: Text('${club.name} approved!')),
             );
           },
-          onReject: () => _showRejectDialog(context, club.name),
+          onReject: () => _showRejectDialog(context, club.name, (reason) {
+             // In real app, update club status to rejected
+             ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${club.name} rejected')),
+              );
+          }),
         );
       },
     );
   }
 
-  void _showRejectDialog(BuildContext context, String name) {
+  void _showRejectDialog(BuildContext context, String name, Function(String) onConfirm) {
     final reasonController = TextEditingController();
     showDialog(
       context: context,
@@ -140,9 +153,7 @@ class _ClubApprovalTab extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$name rejected')),
-              );
+              onConfirm(reasonController.text);
             },
             child: Text('Reject', style: TextStyle(color: AppColors.error)),
           ),
@@ -153,21 +164,155 @@ class _ClubApprovalTab extends StatelessWidget {
 }
 
 class _FlaggedContentTab extends StatelessWidget {
+  final List<Report> reports;
+  final MockDataService dataService;
+
+  const _FlaggedContentTab({
+    required this.reports,
+    required this.dataService,
+  });
+
   @override
   Widget build(BuildContext context) {
-    // For now, show empty state since we don't have reporting system yet
-    return _EmptyState(
-      icon: Icons.flag_outlined,
-      title: 'No flagged content',
-      subtitle: 'Content reported by users will appear here',
+    if (reports.isEmpty) {
+      return _EmptyState(
+        icon: Icons.flag_outlined,
+        title: 'No flagged content',
+        subtitle: 'Content reported by users will appear here',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: reports.length,
+      itemBuilder: (context, index) {
+        final report = reports[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Reported for ${report.reason.name.toUpperCase()}',
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _formatTime(report.timestamp),
+                      style: TextStyle(color: context.appColors.textTertiary, fontSize: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.appColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.appColors.divider),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        report.targetTitle,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: context.appColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        report.targetPreview,
+                        style: TextStyle(
+                          color: context.appColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Reason details: ${report.description}',
+                  style: TextStyle(
+                    color: context.appColors.textSecondary,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          dataService.dismissReport(report.id);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Report dismissed')),
+                          );
+                        },
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Dismiss'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          dataService.deleteContent(report.targetId, report.type);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Content deleted & report resolved')),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Delete Content'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+    if (diff.inHours < 24) {
+      return '${diff.inHours}h ago';
+    }
+    return '${diff.inDays}d ago';
   }
 }
 
 class _EventsTab extends StatelessWidget {
   final List<dynamic> events;
+  final MockDataService dataService;
 
-  const _EventsTab({required this.events});
+  const _EventsTab({
+    required this.events,
+    required this.dataService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -184,36 +329,23 @@ class _EventsTab extends StatelessWidget {
       itemCount: events.take(20).length,
       itemBuilder: (context, index) {
         final event = events[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.eventsColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(event.category.icon, style: const TextStyle(fontSize: 24)),
-              ),
-            ),
-            title: Text(
-              event.title,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: context.appColors.textPrimary,
-              ),
-            ),
-            subtitle: Text(
-              '${event.venue} • ${_formatDate(event.eventDate)}',
-              style: TextStyle(
-                color: context.appColors.textTertiary,
-                fontSize: 12,
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right),
-          ),
+        return _ApprovalCard(
+          icon: event.category.icon,
+          title: event.title,
+          subtitle: '${event.venue} • ${_formatDate(event.eventDate)}',
+          metadata: 'Hosted by: ${event.clubName}',
+          onApprove: () {
+             // In real app, set event.isApproved = true
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text('${event.title} approved!')),
+             );
+          },
+          onReject: () {
+            // In real app, reject event
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text('${event.title} rejected')),
+             );
+          },
         );
       },
     );
@@ -257,7 +389,7 @@ class _ApprovalCard extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppColors.clubsColor.withValues(alpha: 0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
@@ -282,7 +414,7 @@ class _ApprovalCard extends StatelessWidget {
                         metadata,
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.clubsColor,
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

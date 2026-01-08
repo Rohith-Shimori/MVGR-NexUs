@@ -5,6 +5,10 @@ import 'core/theme/app_colors.dart';
 import 'services/mock_data_service.dart';
 import 'services/user_service.dart';
 import 'services/settings_service.dart';
+import 'services/auth_service.dart';
+import 'services/audio_service.dart';
+import 'config/environment.dart';
+import 'config/supabase_config.dart';
 import 'core/utils/helpers.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/clubs/screens/clubs_screen.dart';
@@ -29,18 +33,61 @@ import 'features/interests/screens/interests_screen.dart';
 import 'features/search/screens/search_screen.dart';
 import 'features/council/screens/moderation_dashboard_screen.dart';
 import 'features/faculty/screens/faculty_dashboard_screen.dart';
+import 'core/widgets/mini_player.dart';
+import 'features/onboarding/screens/onboarding_screen.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'services/favorites_service.dart';
+import 'services/notification_service.dart' as notification;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load saved settings from SharedPreferences
+  // Load saved settings and favorites
   await SettingsService.instance.loadFromStorage();
+  await FavoritesService.instance.init();
   
-  runApp(const MVGRNexUsApp());
+  // Initialize Supabase FIRST (required for auth)
+  await SupabaseConfig.initialize();
+  
+  // Initialize auth service
+  await authService.initialize();
+  
+  // Load real data from Supabase into MockDataService
+  // This allows screens to use MockDataService API but with real data
+  await mockDataService.loadFromSupabase();
+  
+  // Initialize audio service for radio playback
+  await audioService.initialize();
+  
+  // Initialize notification service for realtime push notifications
+  await notification.NotificationService.instance.initializeRealtime();
+  
+  // Log data source
+  debugPrint('📊 Data Source: ${mockDataService.isUsingSupabase ? "Supabase" : "Mock"}');
+  
+  // Check if onboarding completed
+  final showOnboarding = !await OnboardingScreen.isCompleted();
+  
+  runApp(MVGRNexUsApp(showOnboarding: showOnboarding));
 }
 
-class MVGRNexUsApp extends StatelessWidget {
-  const MVGRNexUsApp({super.key});
+class MVGRNexUsApp extends StatefulWidget {
+  final bool showOnboarding;
+  
+  const MVGRNexUsApp({super.key, this.showOnboarding = false});
+
+  @override
+  State<MVGRNexUsApp> createState() => _MVGRNexUsAppState();
+}
+
+class _MVGRNexUsAppState extends State<MVGRNexUsApp> {
+  late bool _showOnboarding;
+
+  @override
+  void initState() {
+    super.initState();
+    _showOnboarding = widget.showOnboarding;
+  }
 
   ThemeMode _getThemeMode(AppThemeMode mode) {
     switch (mode) {
@@ -53,16 +100,38 @@ class MVGRNexUsApp extends StatelessWidget {
     }
   }
 
+  Widget _buildHome() {
+    // Show onboarding first
+    if (_showOnboarding) {
+      return OnboardingScreen(
+        onComplete: () => setState(() => _showOnboarding = false),
+      );
+    }
+    
+    // Check auth state - show login if not authenticated
+    // In dev mode with mock data, auto-authenticate
+    if (!authService.isAuthenticated && !AppConfig.current.useMockData) {
+      return LoginScreen(
+        onLoginSuccess: () => setState(() {}),
+      );
+    }
+    
+    // Show main app
+    return const MainNavigationScreen();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // Screens use context.watch<MockDataService>() so must provide this type
         ChangeNotifierProvider(create: (_) => mockDataService),
+        ChangeNotifierProvider.value(value: authService),
         Provider(create: (_) => UserProvider()),
       ],
-      // Listen to SettingsService for theme changes
+      // Listen to SettingsService and AuthService for changes
       child: ListenableBuilder(
-        listenable: SettingsService.instance,
+        listenable: Listenable.merge([SettingsService.instance, authService]),
         builder: (context, _) {
           return MaterialApp(
             title: 'MVGR NexUs',
@@ -70,7 +139,7 @@ class MVGRNexUsApp extends StatelessWidget {
             theme: lightTheme,
             darkTheme: darkTheme,
             themeMode: _getThemeMode(SettingsService.instance.themeMode),
-            home: const MainNavigationScreen(),
+            home: _buildHome(),
             routes: {
               '/clubs': (context) => const ClubsScreen(),
               '/events': (context) => const EventsScreen(),
@@ -94,6 +163,9 @@ class MVGRNexUsApp extends StatelessWidget {
               '/moderation': (context) => const ModerationDashboardScreen(),
               '/faculty': (context) => const FacultyDashboardScreen(),
               '/search': (context) => const GlobalSearchScreen(),
+              '/login': (context) => LoginScreen(
+                onLoginSuccess: () => Navigator.of(context).pushReplacementNamed('/'),
+              ),
             },
           );
         },
@@ -128,36 +200,43 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Explore',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups),
-            label: 'Community',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.construction_outlined),
-            selectedIcon: Icon(Icons.construction),
-            label: 'Tools',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MiniPlayer(),
+          NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (index) {
+              HapticUtils.selection();
+              setState(() => _currentIndex = index);
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.explore_outlined),
+                selectedIcon: Icon(Icons.explore),
+                label: 'Explore',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.groups_outlined),
+                selectedIcon: Icon(Icons.groups),
+                label: 'Community',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.construction_outlined),
+                selectedIcon: Icon(Icons.construction),
+                label: 'Tools',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
           ),
         ],
       ),
@@ -286,117 +365,7 @@ class ToolsScreen extends StatelessWidget {
   }
 }
 
-/// Profile screen
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  @override
-  Widget build(BuildContext context) {
-    final user = MockUserService.currentUser;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Profile header
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      NameHelpers.getAvatarChar(user.name),
-                      style: TextStyle(fontSize: 32, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(user.name, style: Theme.of(context).textTheme.headlineSmall),
-                  Text(user.email, style: Theme.of(context).textTheme.bodyMedium),
-                  const SizedBox(height: 8),
-                  Chip(label: Text(user.role.displayName)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Stats
-          Row(
-            children: [
-              Expanded(child: _StatCard(icon: Icons.groups, value: '3', label: 'Clubs')),
-              const SizedBox(width: 8),
-              Expanded(child: _StatCard(icon: Icons.event, value: '12', label: 'Events')),
-              const SizedBox(width: 8),
-              Expanded(child: _StatCard(icon: Icons.upload_file, value: '5', label: 'Uploads')),
-            ],
-          ),
-          const SizedBox(height: 24),
-          
-          // Role switcher (Dev only)
-          Card(
-            color: Colors.amber.shade50,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.developer_mode, size: 20),
-                      SizedBox(width: 8),
-                      Text('Developer Mode', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('Switch roles to test different permissions:'),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _RoleButton(label: 'Student', onTap: () {
-                        MockUserService.loginAsStudent();
-                        setState(() {});
-                      }),
-                      _RoleButton(label: 'Club Admin', onTap: () {
-                        MockUserService.loginAsClubAdmin();
-                        setState(() {});
-                      }),
-                      _RoleButton(label: 'Council', onTap: () {
-                        MockUserService.loginAsCouncil();
-                        setState(() {});
-                      }),
-                      _RoleButton(label: 'Faculty', onTap: () {
-                        MockUserService.loginAsFaculty();
-                        setState(() {});
-                      }),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ProfileScreen removed (dead code, replaced by features/profile/screens/profile_screen.dart)
 
 // Helper widgets
 class _FeatureTile extends StatelessWidget {
@@ -420,58 +389,24 @@ class _FeatureTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Container(
-          padding: const EdgeInsets.all(10),
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: color),
+          child: Center(child: Icon(icon, color: color)),
         ),
         title: Text(title),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+        onTap: () {
+          HapticUtils.lightTap();
+          onTap();
+        },
       ),
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
 
-  const _StatCard({required this.icon, required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: AppColors.primary),
-            const SizedBox(height: 8),
-            Text(value, style: Theme.of(context).textTheme.headlineSmall),
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _RoleButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onTap,
-      child: Text(label),
-    );
-  }
-}

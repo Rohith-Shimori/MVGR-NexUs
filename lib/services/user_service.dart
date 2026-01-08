@@ -9,15 +9,15 @@ class MockUserService {
     AppUser.testStudent(),
     AppUser.testStudent(name: 'Club Admin', role: UserRole.clubAdmin).copyWith(
       uid: 'club_admin_001',
-      email: 'clubadmin@mvgr.edu.in',
+      email: 'clubadmin@mvgrce.edu.in',
     ),
     AppUser.testStudent(name: 'Council Member', role: UserRole.council).copyWith(
       uid: 'council_001',
-      email: 'council@mvgr.edu.in',
+      email: 'council@mvgrce.edu.in',
     ),
     AppUser.testStudent(name: 'Faculty Member', role: UserRole.faculty).copyWith(
       uid: 'faculty_001',
-      email: 'faculty@mvgr.edu.in',
+      email: 'faculty@mvgrce.edu.in',
       department: 'Computer Science',
     ),
   ];
@@ -72,6 +72,24 @@ class MockUserService {
     } else {
       _currentUser = _testUsers[0].copyWith(interests: interests);
     }
+  }
+
+  /// Update current user's profile
+  static void updateProfile({
+    String? bio,
+    String? profilePhotoUrl,
+    String? backgroundType,
+    int? backgroundColorValue,
+    String? backgroundImageUrl,
+  }) {
+    final current = _currentUser ?? _testUsers[0];
+    _currentUser = current.copyWith(
+      bio: bio ?? current.bio,
+      profilePhotoUrl: profilePhotoUrl ?? current.profilePhotoUrl,
+      backgroundType: backgroundType ?? current.backgroundType,
+      backgroundColorValue: backgroundColorValue ?? current.backgroundColorValue,
+      backgroundImageUrl: backgroundImageUrl ?? current.backgroundImageUrl,
+    );
   }
 }
 

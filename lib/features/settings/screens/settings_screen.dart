@@ -3,6 +3,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/settings_service.dart';
 import '../../../services/user_service.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/audio_service.dart';
 
 /// Premium Settings Screen
 class SettingsScreen extends StatefulWidget {
@@ -243,6 +245,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsCard(
             isDark: isDark,
             children: [
+              _ActionTile(
+                icon: Icons.logout,
+                title: 'Sign Out',
+                subtitle: 'Sign out of your account',
+                actionText: 'Sign Out',
+                actionColor: AppColors.primary,
+                onTap: () => _signOut(context),
+                isDark: isDark,
+              ),
+              Divider(height: 1, color: isDark ? AppColors.dividerDark : context.appColors.divider),
               _ActionTile(
                 icon: Icons.delete_forever,
                 title: 'Delete Account',
@@ -497,6 +509,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Delete Account'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _signOut(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              
+              // Stop any playing audio
+              audioService.stop();
+              
+              // Sign out from Supabase
+              await authService.signOut();
+              
+              // Navigate to login screen and clear navigation stack
+              if (context.mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Signed out successfully'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Sign Out'),
           ),
         ],
       ),

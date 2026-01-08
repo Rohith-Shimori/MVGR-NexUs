@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../../core/constants/app_constants.dart';
 
 /// Discussion Forum Categories (not just academic!)
@@ -105,10 +105,9 @@ class AcademicQuestion {
     this.status = ModerationStatus.approved,
   });
 
-  factory AcademicQuestion.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory AcademicQuestion.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return AcademicQuestion(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       authorId: data['authorId'],
       authorName: data['isAnonymous'] == true ? 'Anonymous' : data['authorName'],
       isAnonymous: data['isAnonymous'] ?? false,
@@ -126,7 +125,7 @@ class AcademicQuestion {
       viewCount: data['viewCount'] ?? 0,
       answerCount: data['answerCount'] ?? 0,
       upvoteCount: data['upvoteCount'] ?? 0,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
       status: ModerationStatus.values.firstWhere(
         (s) => s.name == data['status'],
         orElse: () => ModerationStatus.pending,
@@ -150,7 +149,7 @@ class AcademicQuestion {
       'viewCount': viewCount,
       'answerCount': answerCount,
       'upvoteCount': upvoteCount,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
       'status': status.name,
     };
   }
@@ -301,10 +300,9 @@ class Answer {
     this.editedAt,
   });
 
-  factory Answer.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Answer.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return Answer(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       questionId: data['questionId'] ?? '',
       authorId: data['authorId'] ?? '',
       authorName: data['authorName'] ?? '',
@@ -312,8 +310,8 @@ class Answer {
       isAccepted: data['isAccepted'] ?? false,
       helpfulCount: data['helpfulCount'] ?? 0,
       helpfulByIds: List<String>.from(data['helpfulByIds'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      editedAt: (data['editedAt'] as Timestamp?)?.toDate(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
+      editedAt: data['editedAt'] != null ? DateTime.parse(data['editedAt']) : null,
     );
   }
 
@@ -326,8 +324,8 @@ class Answer {
       'isAccepted': isAccepted,
       'helpfulCount': helpfulCount,
       'helpfulByIds': helpfulByIds,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'editedAt': editedAt != null ? Timestamp.fromDate(editedAt!) : null,
+      'createdAt': createdAt.toIso8601String(),
+      'editedAt': editedAt?.toIso8601String(),
     };
   }
 

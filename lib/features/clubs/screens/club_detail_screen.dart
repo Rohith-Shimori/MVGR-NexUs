@@ -3,23 +3,36 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
+import '../../../core/utils/helpers.dart';
 import '../models/club_model.dart';
 import '../widgets/club_widgets.dart';
 
 /// Club Detail Screen - Full club information view
-class ClubDetailScreen extends StatelessWidget {
+class ClubDetailScreen extends StatefulWidget {
   final Club club;
 
   const ClubDetailScreen({super.key, required this.club});
 
   @override
+  State<ClubDetailScreen> createState() => _ClubDetailScreenState();
+}
+
+class _ClubDetailScreenState extends State<ClubDetailScreen> {
+  String _selectedFilter = 'All'; // All, Announcements, Recruitment
+
+  @override
   Widget build(BuildContext context) {
     return Consumer<MockDataService>(
       builder: (context, dataService, _) {
-        final currentClub = dataService.getClubById(club.id) ?? club;
-        final user = MockUserService.currentUser;
+        final currentClub = dataService.getClubById(widget.club.id) ?? widget.club;
+        final user = context.read<UserProvider>().currentUser;
         final isMember = currentClub.isMember(user.uid);
-        final posts = dataService.getClubPosts(currentClub.id);
+        final allPosts = dataService.getClubPosts(currentClub.id);
+        
+        // Filter posts
+        final posts = _selectedFilter == 'All' 
+            ? allPosts 
+            : allPosts.where((p) => p.type.displayName == _selectedFilter).toList();
 
         return Scaffold(
           body: CustomScrollView(
@@ -43,9 +56,10 @@ class ClubDetailScreen extends StatelessWidget {
                       ),
                     ),
                     child: Center(
-                      child: Text(
-                        currentClub.category.icon,
-                        style: TextStyle(fontSize: 80),
+                      child: Icon(
+                        currentClub.category.iconData,
+                        size: 80,
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
                   ),
@@ -113,7 +127,7 @@ class ClubDetailScreen extends StatelessWidget {
                         children: [
                           ClubStat(value: '${currentClub.totalMembers}', label: 'Members'),
                           Container(width: 1, height: 30, color: context.appColors.divider),
-                          ClubStat(value: '${posts.length}', label: 'Posts'),
+                          ClubStat(value: '${allPosts.length}', label: 'Posts'),
                           Container(width: 1, height: 30, color: context.appColors.divider),
                           ClubStat(value: '12', label: 'Events'),
                         ],
@@ -165,20 +179,51 @@ class ClubDetailScreen extends StatelessWidget {
                       const SizedBox(height: 24),
                     ],
 
-                    // Recent Posts
-                    Text(
-                      'Recent Posts',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: context.appColors.textPrimary,
-                      ),
+                    // Posts Section Header with Filters
+                    Row(
+                      children: [
+                        Text(
+                          'Posts',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: context.appColors.textPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        // Add post button only for admins (visual only for now)
+                        if (currentClub.isAdmin(user.uid))
+                          IconButton(
+                            onPressed: () {},
+                            icon: Icon(Icons.add_circle_outline, color: AppColors.clubsColor),
+                            tooltip: 'New Post',
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 12),
+                    
+                    // Filter Chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildFilterChip('All'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Announcement'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Recruitment'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Event'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Posts List
                     if (posts.isEmpty)
-                      ClubEmptyCard(message: 'No posts yet')
+                      ClubEmptyCard(message: 'No ${_selectedFilter.toLowerCase()} posts yet')
                     else
-                      ...posts.take(3).map((post) => Padding(
+                      ...posts.map((post) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: PostCard(post: post),
                       )),
@@ -191,6 +236,34 @@ class ClubDetailScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFilterChip(String label) {
+    final isSelected = _selectedFilter == label;
+    return GestureDetector(
+      onTap: () {
+         HapticUtils.selection();
+         setState(() => _selectedFilter = label);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.clubsColor : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.clubsColor : context.appColors.divider,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isSelected ? Colors.white : context.appColors.textSecondary,
+          ),
+        ),
+      ),
     );
   }
 }

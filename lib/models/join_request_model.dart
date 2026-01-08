@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Status of a club join request
 enum ClubJoinStatus {
@@ -88,18 +88,17 @@ class ClubJoinRequest {
       'clubId': clubId,
       'clubName': clubName,
       'status': status.name,
-      'requestedAt': Timestamp.fromDate(requestedAt),
-      'resolvedAt': resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
+      'requestedAt': requestedAt.toIso8601String(),
+      'resolvedAt': resolvedAt?.toIso8601String(),
       'resolvedBy': resolvedBy,
       'note': note,
       'rejectionReason': rejectionReason,
     };
   }
 
-  factory ClubJoinRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory ClubJoinRequest.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return ClubJoinRequest(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
       clubId: data['clubId'] ?? '',
@@ -108,10 +107,8 @@ class ClubJoinRequest {
         (s) => s.name == data['status'],
         orElse: () => ClubJoinStatus.pending,
       ),
-      requestedAt: (data['requestedAt'] as Timestamp).toDate(),
-      resolvedAt: data['resolvedAt'] != null
-          ? (data['resolvedAt'] as Timestamp).toDate()
-          : null,
+      requestedAt: data['requestedAt'] != null ? DateTime.parse(data['requestedAt']) : DateTime.now(),
+      resolvedAt: data['resolvedAt'] != null ? DateTime.parse(data['resolvedAt']) : null,
       resolvedBy: data['resolvedBy'],
       note: data['note'],
       rejectionReason: data['rejectionReason'],

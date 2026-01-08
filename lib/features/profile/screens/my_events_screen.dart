@@ -128,9 +128,10 @@ class _EventCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Center(
-                    child: Text(
-                      event.category.icon,
-                      style: TextStyle(fontSize: 32),
+                    child: Icon(
+                      event.category.iconData,
+                      size: 32,
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
                   Positioned(

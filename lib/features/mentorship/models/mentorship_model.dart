@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Mentor type
 enum MentorType {
@@ -129,10 +129,9 @@ class Mentor {
     required this.createdAt,
   });
 
-  factory Mentor.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Mentor.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return Mentor(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       userId: data['userId'] ?? '',
       name: data['name'] ?? '',
       type: MentorType.values.firstWhere(
@@ -154,7 +153,7 @@ class Mentor {
       maxMentees: data['maxMentees'] ?? 5,
       currentMentees: data['currentMentees'] ?? 0,
       isAvailable: data['isAvailable'] ?? true,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
     );
   }
 
@@ -173,7 +172,7 @@ class Mentor {
       'maxMentees': maxMentees,
       'currentMentees': currentMentees,
       'isAvailable': isAvailable,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
@@ -238,10 +237,9 @@ class MentorshipRequest {
     this.acceptedAt,
   });
 
-  factory MentorshipRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory MentorshipRequest.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return MentorshipRequest(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       mentorId: data['mentorId'] ?? '',
       menteeId: data['menteeId'] ?? '',
       menteeName: data['menteeName'] ?? '',
@@ -252,8 +250,8 @@ class MentorshipRequest {
       message: data['message'] ?? '',
       goal: data['goal'] ?? '',
       status: data['status'] ?? 'pending',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      acceptedAt: (data['acceptedAt'] as Timestamp?)?.toDate(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
+      acceptedAt: data['acceptedAt'] != null ? DateTime.parse(data['acceptedAt']) : null,
     );
   }
 
@@ -266,8 +264,8 @@ class MentorshipRequest {
       'message': message,
       'goal': goal,
       'status': status,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'acceptedAt': acceptedAt != null ? Timestamp.fromDate(acceptedAt!) : null,
+      'createdAt': createdAt.toIso8601String(),
+      'acceptedAt': acceptedAt?.toIso8601String(),
     };
   }
 
@@ -297,17 +295,16 @@ class MentorshipSession {
     required this.createdAt,
   });
 
-  factory MentorshipSession.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory MentorshipSession.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return MentorshipSession(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       mentorId: data['mentorId'] ?? '',
       menteeId: data['menteeId'] ?? '',
-      scheduledAt: (data['scheduledAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      scheduledAt: data['scheduledAt'] != null ? DateTime.parse(data['scheduledAt']) : DateTime.now(),
       topic: data['topic'],
       notes: data['notes'],
       completed: data['completed'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
     );
   }
 
@@ -315,11 +312,11 @@ class MentorshipSession {
     return {
       'mentorId': mentorId,
       'menteeId': menteeId,
-      'scheduledAt': Timestamp.fromDate(scheduledAt),
+      'scheduledAt': scheduledAt.toIso8601String(),
       'topic': topic,
       'notes': notes,
       'completed': completed,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }

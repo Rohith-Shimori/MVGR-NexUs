@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
+import '../../../services/audio_service.dart';
 import '../models/radio_model.dart';
 
 /// Premium Radio Screen - Campus Radio Experience
@@ -242,67 +243,237 @@ class _LiveBadge extends StatelessWidget {
   }
 }
 
-/// Now Playing Card
+/// Now Playing Card with Audio Playback
 class _NowPlayingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.music_note, color: Colors.white, size: 28),
+    return ListenableBuilder(
+      listenable: audioService,
+      builder: (context, _) {
+        final track = audioService.currentTrack;
+        final isPlaying = audioService.isPlaying;
+        
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'NOW PLAYING',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.7),
-                    letterSpacing: 1,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Main player row
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      isPlaying ? Icons.graphic_eq : Icons.music_note,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isPlaying ? 'NOW PLAYING' : 'SELECT A TRACK',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.7),
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          track?.name ?? 'MVGR Radio',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          track?.artistName ?? 'Campus Radio • Evening Vibes',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Play/Pause button
+                  GestureDetector(
+                    onTap: () {
+                      if (track != null) {
+                        audioService.togglePlayPause();
+                      } else {
+                        // Show track picker
+                        _showTrackPicker(context);
+                      }
+                    },
+                    child: Icon(
+                      isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                      size: 48,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Progress bar when playing
+              if (track != null) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: audioService.progress,
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    minHeight: 4,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Tune In Soon!',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Campus Radio • Evening Vibes',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _formatDuration(audioService.position),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    Text(
+                      _formatDuration(audioService.duration),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
                 ),
               ],
+              
+              // Track selection buttons
+              if (track == null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _TrackButton(
+                        label: '🎵 Telugu',
+                        onTap: () => audioService.playTelugu(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _TrackButton(
+                        label: '🎶 English',
+                        onTap: () => audioService.playEnglish(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  void _showTrackPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Choose a Track',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: context.appColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.music_note, color: AppColors.radioColor),
+              title: const Text('Telugu Song'),
+              subtitle: const Text('Local Artist'),
+              onTap: () {
+                Navigator.pop(context);
+                audioService.playTelugu();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.music_note, color: AppColors.primary),
+              title: const Text('English Song'),
+              subtitle: const Text('International Artist'),
+              onTap: () {
+                Navigator.pop(context);
+                audioService.playEnglish();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Track selection button
+class _TrackButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  
+  const _TrackButton({required this.label, required this.onTap});
+  
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
-          Icon(
-            Icons.play_circle_fill,
-            size: 48,
-            color: Colors.white.withValues(alpha: 0.9),
-          ),
-        ],
+        ),
       ),
     );
   }

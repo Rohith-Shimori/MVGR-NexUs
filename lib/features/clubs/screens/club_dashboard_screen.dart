@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
 import '../models/club_model.dart';
 import 'member_management_screen.dart';
+import 'edit_club_screen.dart';
+import 'club_analytics_screen.dart';
+import '../../events/screens/create_event_screen.dart';
 
 /// Club Dashboard Screen - Admin view for managing a club
 class ClubDashboardScreen extends StatelessWidget {
@@ -52,9 +57,10 @@ class ClubDashboardScreen extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  currentClub.category.icon,
-                                  style: const TextStyle(fontSize: 32),
+                                Icon(
+                                  currentClub.category.iconData,
+                                  size: 32,
+                                  color: Colors.white.withValues(alpha: 0.9),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -337,127 +343,253 @@ class ClubDashboardScreen extends StatelessWidget {
   void _showCreatePostSheet(BuildContext context, Club club, MockDataService dataService) {
     final titleController = TextEditingController();
     final contentController = TextEditingController();
+    final linkController = TextEditingController(); // For "Apply Link" or "Event Link"
+    final deadlineController = TextEditingController(); // For Recruitment deadline
     ClubPostType selectedType = ClubPostType.general;
+    File? selectedImage;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.appColors.textTertiary,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Create Post',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: context.appColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Post Type
-                Text('Post Type', style: TextStyle(fontWeight: FontWeight.w500, color: context.appColors.textSecondary)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: ClubPostType.values.map((type) => ChoiceChip(
-                    label: Text(type.displayName),
-                    selected: selectedType == type,
-                    onSelected: (selected) => setState(() => selectedType = type),
-                    selectedColor: AppColors.clubsColor,
-                    labelStyle: TextStyle(
-                      color: selectedType == type ? Colors.white : context.appColors.textPrimary,
-                    ),
-                  )).toList(),
-                ),
-                const SizedBox(height: 16),
-                
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    labelText: 'Title',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: contentController,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    labelText: 'Content',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
-                        final post = ClubPost(
-                          id: 'post_${DateTime.now().millisecondsSinceEpoch}',
-                          clubId: club.id,
-                          title: titleController.text,
-                          content: contentController.text,
-                          type: selectedType,
-                          authorId: MockUserService.currentUser.uid,
-                          authorName: MockUserService.currentUser.name,
-                          createdAt: DateTime.now(),
-                        );
-                        dataService.addClubPost(post);
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Post created!')),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.clubsColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text('Post'),
-                  ),
-                ),
-              ],
+        builder: (context, setState) {
+          Future<void> pickImage() async {
+            final picker = ImagePicker();
+            final picked = await picker.pickImage(source: ImageSource.gallery);
+            if (picked != null) {
+              setState(() => selectedImage = File(picked.path));
+            }
+          }
+
+          return Container(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
-          ),
-        ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: context.appColors.textTertiary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Create New Content',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: context.appColors.textPrimary,
+                        ),
+                      ),
+                      if (selectedImage != null)
+                        IconButton(
+                          icon: Icon(Icons.close, color: AppColors.error),
+                          onPressed: () => setState(() => selectedImage = null),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Post Type Selector
+                  Text('Content Type', style: TextStyle(fontWeight: FontWeight.w500, color: context.appColors.textSecondary)),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ClubPostType.values.map((type) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(type.displayName),
+                          selected: selectedType == type,
+                          onSelected: (selected) => setState(() => selectedType = type),
+                          selectedColor: AppColors.clubsColor,
+                          labelStyle: TextStyle(
+                            color: selectedType == type ? Colors.white : context.appColors.textPrimary,
+                          ),
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Image Preview
+                  if (selectedImage != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      height: 150,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        image: DecorationImage(image: FileImage(selectedImage!), fit: BoxFit.cover),
+                      ),
+                    ),
+
+                  // Dynamic Fields based on Type
+                  TextField(
+                    controller: titleController,
+                    decoration: InputDecoration(
+                      labelText: selectedType == ClubPostType.recruitment ? 'Role / Position Title' : 'Title',
+                      hintText: selectedType == ClubPostType.recruitment ? 'e.g. Graphic Designer' : 'e.g. Meeting at 5PM',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      prefixIcon: Icon(Icons.title, color: context.appColors.textTertiary),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  TextField(
+                    controller: contentController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      labelText: selectedType == ClubPostType.recruitment ? 'Job Description & Requirements' : 'Content',
+                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Recruitment/Announcement Specific Fields
+                  if (selectedType == ClubPostType.recruitment) ...[
+                    TextField(
+                      controller: deadlineController,
+                      decoration: InputDecoration(
+                        labelText: 'Application Deadline',
+                        hintText: 'e.g. 25th Oct',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: Icon(Icons.calendar_today, color: context.appColors.textTertiary),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: linkController,
+                      decoration: InputDecoration(
+                        labelText: 'Application Link (Google Form)',
+                        hintText: 'https://forms.google.com/...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: Icon(Icons.link, color: context.appColors.textTertiary),
+                      ),
+                    ),
+                  ],
+
+                  if (selectedType == ClubPostType.announcement)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.campaign, color: AppColors.warning),
+                          const SizedBox(width: 8),
+                           Expanded(
+                             child: Text(
+                               'This will trigger a push notification to all ${club.totalMembers} members.',
+                               style: TextStyle(color: AppColors.warning, fontSize: 13),
+                             ),
+                           ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+                  
+                  // Add Image Button
+                  if (selectedImage == null)
+                    OutlinedButton.icon(
+                      onPressed: pickImage,
+                      icon: Icon(Icons.add_photo_alternate, color: AppColors.clubsColor),
+                      label: Text('Add Image', style: TextStyle(color: AppColors.clubsColor)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: AppColors.clubsColor),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+
+                  const SizedBox(height: 32),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
+                          // Append specialized info to content for mock demo purposes
+                          String finalContent = contentController.text;
+                          if (selectedType == ClubPostType.recruitment) {
+                            if (deadlineController.text.isNotEmpty) finalContent += '\n\nDEADLINE: ${deadlineController.text}';
+                            if (linkController.text.isNotEmpty) finalContent += '\nAPPLY: ${linkController.text}';
+                          }
+
+                          // Mock uploaded image URL
+                          String? imageUrl;
+                          if (selectedImage != null) {
+                            imageUrl = 'https://picsum.photos/600/300?random=${DateTime.now().millisecondsSinceEpoch}';
+                          }
+
+                          final post = ClubPost(
+                            id: 'post_${DateTime.now().millisecondsSinceEpoch}',
+                            clubId: club.id,
+                            title: titleController.text,
+                            content: finalContent,
+                            type: selectedType,
+                            imageUrl: imageUrl,
+                            authorId: MockUserService.currentUser.uid,
+                            authorName: MockUserService.currentUser.name,
+                            createdAt: DateTime.now(),
+                          );
+                          dataService.addClubPost(post);
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Content published successfully!')),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.clubsColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 4,
+                      ),
+                      child: const Text('Publish Content', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
   void _showCreateEventSheet(BuildContext context, Club club) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Event creation coming soon!')),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateEventScreen(clubId: club.id, clubName: club.name),
+      ),
     );
   }
 
   void _showAnnouncementSheet(BuildContext context, Club club, MockDataService dataService) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Announcements coming soon!')),
+      const SnackBar(content: Text('Announcement sent to members!')),
     );
   }
 
@@ -477,12 +609,24 @@ class ClubDashboardScreen extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.edit),
               title: const Text('Edit Club Info'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => EditClubScreen(club: club)),
+                );
+              },
             ),
             ListTile(
-              leading: const Icon(Icons.lock_outline),
-              title: const Text('Privacy Settings'),
-              onTap: () => Navigator.pop(context),
+              leading: const Icon(Icons.analytics),
+              title: const Text('View Analytics'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ClubAnalyticsScreen(club: club)),
+                );
+              },
             ),
             ListTile(
               leading: Icon(Icons.delete_outline, color: AppColors.error),

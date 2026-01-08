@@ -435,26 +435,32 @@ class _MentorCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                // Connect Button
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: mentor.hasCapacity
-                        ? AppColors.mentorshipColor
-                        : context.appColors.textTertiary.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    mentor.hasCapacity ? 'Connect' : 'Full',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                // Connect Button - Now tappable!
+                GestureDetector(
+                  onTap: mentor.hasCapacity ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => _MentorDetailScreen(mentor: mentor)),
+                  ) : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
                       color: mentor.hasCapacity
-                          ? Colors.white
-                          : context.appColors.textTertiary,
+                          ? AppColors.mentorshipColor
+                          : context.appColors.textTertiary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      mentor.hasCapacity ? 'Connect' : 'Full',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: mentor.hasCapacity
+                            ? Colors.white
+                            : context.appColors.textTertiary,
+                      ),
                     ),
                   ),
                 ),

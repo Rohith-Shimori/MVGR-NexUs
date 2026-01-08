@@ -1,4 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// Haptic feedback utilities for premium feel
+class HapticUtils {
+  /// Light tap feedback - for regular button taps
+  static void lightTap() {
+    HapticFeedback.lightImpact();
+  }
+  
+  /// Medium tap feedback - for important actions
+  static void mediumTap() {
+    HapticFeedback.mediumImpact();
+  }
+  
+  /// Heavy tap feedback - for confirmations, deletions
+  static void heavyTap() {
+    HapticFeedback.heavyImpact();
+  }
+  
+  /// Selection changed feedback - for toggles, switches
+  static void selection() {
+    HapticFeedback.selectionClick();
+  }
+  
+  /// Vibration pattern for success
+  static void success() {
+    HapticFeedback.mediumImpact();
+  }
+  
+  /// Vibration pattern for error
+  static void error() {
+    HapticFeedback.heavyImpact();
+  }
+  
+  /// Vibration for pull-to-refresh threshold
+  static void pullToRefresh() {
+    HapticFeedback.selectionClick();
+  }
+}
 
 /// Validation helpers for forms
 class Validators {
@@ -19,7 +58,7 @@ class Validators {
       return 'College email is required';
     }
     final email = value.toLowerCase();
-    if (!email.endsWith('@mvgr.edu.in') && !email.endsWith('@student.mvgr.edu.in')) {
+    if (!email.endsWith('@mvgrce.edu.in') && !email.endsWith('@student.mvgrce.edu.in')) {
       return 'Please use your college email';
     }
     return null;
@@ -117,6 +156,10 @@ class UIHelpers {
       ),
     );
   }
+  
+  /// Alias for showSuccess
+  static void showSuccessSnackBar(BuildContext context, String message) => 
+      showSuccess(context, message);
   
   /// Show an error snackbar
   static void showError(BuildContext context, String message) {
@@ -336,5 +379,161 @@ class ErrorHandler {
       logError(e, stackTrace, context);
       return Result.failure(getUserMessage(e));
     }
+  }
+}
+
+/// Custom page route with slide transition from right
+class SlidePageRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+  final Duration duration;
+
+  SlidePageRoute({
+    required this.page,
+    this.duration = const Duration(milliseconds: 300),
+  }) : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          reverseTransitionDuration: duration,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curve = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(curve),
+              child: child,
+            );
+          },
+        );
+}
+
+/// Custom page route with fade transition
+class FadePageRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+  final Duration duration;
+
+  FadePageRoute({
+    required this.page,
+    this.duration = const Duration(milliseconds: 250),
+  }) : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          reverseTransitionDuration: duration,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: child,
+            );
+          },
+        );
+}
+
+/// Custom page route with scale and fade transition
+class ScalePageRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+  final Duration duration;
+
+  ScalePageRoute({
+    required this.page,
+    this.duration = const Duration(milliseconds: 300),
+  }) : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          reverseTransitionDuration: duration,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curve = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutBack,
+            );
+            return ScaleTransition(
+              scale: Tween<double>(begin: 0.9, end: 1.0).animate(curve),
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+            );
+          },
+        );
+}
+
+/// Custom page route with slide from bottom (for modals)
+class ModalPageRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+  final Duration duration;
+  final bool _opaque;
+
+  ModalPageRoute({
+    required this.page,
+    this.duration = const Duration(milliseconds: 300),
+    bool opaque = true,
+  }) : _opaque = opaque,
+       super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          reverseTransitionDuration: duration,
+          settings: null,
+  );
+
+  @override
+  bool get opaque => _opaque;
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
+    final curve = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0.0, 1.0),
+        end: Offset.zero,
+      ).animate(curve),
+      child: child,
+    );
+  }
+}
+
+/// Navigation helper for smooth transitions
+class NavigationHelpers {
+  /// Navigate with slide transition
+  static Future<T?> pushSlide<T>(BuildContext context, Widget page) {
+    HapticUtils.lightTap();
+    return Navigator.of(context).push(SlidePageRoute<T>(page: page));
+  }
+
+  /// Navigate with fade transition
+  static Future<T?> pushFade<T>(BuildContext context, Widget page) {
+    return Navigator.of(context).push(FadePageRoute<T>(page: page));
+  }
+
+  /// Navigate with scale transition
+  static Future<T?> pushScale<T>(BuildContext context, Widget page) {
+    HapticUtils.lightTap();
+    return Navigator.of(context).push(ScalePageRoute<T>(page: page));
+  }
+
+  /// Navigate with modal (bottom slide) transition
+  static Future<T?> pushModal<T>(BuildContext context, Widget page) {
+    HapticUtils.mediumTap();
+    return Navigator.of(context).push(ModalPageRoute<T>(page: page));
+  }
+
+  /// Replace with slide transition
+  static Future<T?> replaceSlide<T>(BuildContext context, Widget page) {
+    return Navigator.of(context).pushReplacement(SlidePageRoute<T>(page: page));
+  }
+
+  /// Pop with haptic feedback
+  static void pop<T>(BuildContext context, [T? result]) {
+    HapticUtils.lightTap();
+    Navigator.of(context).pop(result);
   }
 }

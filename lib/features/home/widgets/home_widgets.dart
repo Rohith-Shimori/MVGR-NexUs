@@ -111,12 +111,13 @@ class QuickAccessGrid extends StatelessWidget {
   }
 }
 
-/// Quick Access Item
-class QuickItem extends StatelessWidget {
+/// Quick Access Item with optional image support and tap animation
+class QuickItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final Color color;
   final String route;
+  final String? imagePath;
 
   const QuickItem({
     super.key,
@@ -124,37 +125,74 @@ class QuickItem extends StatelessWidget {
     required this.label,
     required this.color,
     required this.route,
+    this.imagePath,
   });
+
+  @override
+  State<QuickItem> createState() => _QuickItemState();
+}
+
+class _QuickItemState extends State<QuickItem> with SingleTickerProviderStateMixin {
+  bool _isPressed = false;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, route),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: color, size: 26),
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        Navigator.pushNamed(context, widget.route);
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.9 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: widget.color.withValues(alpha: _isPressed ? 0.2 : 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: _isPressed ? [] : [
+                    BoxShadow(
+                      color: widget.color.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: widget.imagePath != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.asset(
+                          widget.imagePath!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Icon(widget.icon, color: widget.color, size: 26),
+                        ),
+                      )
+                    : Icon(widget.icon, color: widget.color, size: 26),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: context.appColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: context.appColors.textSecondary,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -175,7 +213,10 @@ class AnnouncementsSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            HomeSectionTitle(title: 'Announcements'),
+            HomeSectionTitle(
+              title: 'Announcements',
+              onSeeAll: () => Navigator.pushNamed(context, '/announcements'),
+            ),
             const SizedBox(height: 16),
             ...announcements.map(
               (announcement) => Padding(
@@ -511,7 +552,7 @@ class ActiveClubsSection extends StatelessWidget {
                   final club = clubs[index];
                   return ClubChip(
                     name: club.name,
-                    icon: club.category.icon,
+                    iconData: club.category.iconData,
                     memberCount: club.totalMembers,
                     onTap: () => Navigator.pushNamed(context, '/clubs'),
                   );
@@ -525,17 +566,17 @@ class ActiveClubsSection extends StatelessWidget {
   }
 }
 
-/// Club Chip
+/// Club Chip with Material Icon
 class ClubChip extends StatelessWidget {
   final String name;
-  final String icon;
+  final IconData iconData;
   final int memberCount;
   final VoidCallback onTap;
 
   const ClubChip({
     super.key,
     required this.name,
-    required this.icon,
+    required this.iconData,
     required this.memberCount,
     required this.onTap,
   });
@@ -555,7 +596,15 @@ class ClubChip extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(icon, style: TextStyle(fontSize: 28)),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.clubsColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(iconData, color: AppColors.clubsColor, size: 22),
+            ),
             const SizedBox(height: 8),
             Text(
               name,

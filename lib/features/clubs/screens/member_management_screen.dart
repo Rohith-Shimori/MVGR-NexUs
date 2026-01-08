@@ -101,7 +101,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen>
   }
 }
 
-class _MembersTab extends StatelessWidget {
+class _MembersTab extends StatefulWidget {
   final Club club;
   final MockDataService dataService;
   final String currentUserId;
@@ -113,9 +113,28 @@ class _MembersTab extends StatelessWidget {
   });
 
   @override
+  State<_MembersTab> createState() => _MembersTabState();
+}
+
+class _MembersTabState extends State<_MembersTab> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final allMembers = [...club.adminIds, ...club.memberIds];
+    final allMembers = [...widget.club.adminIds, ...widget.club.memberIds];
     final uniqueMembers = allMembers.toSet().toList();
+    
+    // Filter members by search query
+    final filteredMembers = _searchQuery.isEmpty
+        ? uniqueMembers
+        : uniqueMembers.where((id) => id.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
     if (uniqueMembers.isEmpty) {
       return Center(
@@ -137,30 +156,72 @@ class _MembersTab extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: uniqueMembers.length,
-      itemBuilder: (context, index) {
-        final memberId = uniqueMembers[index];
-        final isAdmin = club.isAdmin(memberId);
-        final isCurrentUser = memberId == currentUserId;
+    return Column(
+      children: [
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (value) => setState(() => _searchQuery = value),
+            decoration: InputDecoration(
+              hintText: 'Search members...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: context.appColors.inputBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ),
+        // Members list
+        Expanded(
+          child: filteredMembers.isEmpty
+              ? Center(
+                  child: Text(
+                    'No members found',
+                    style: TextStyle(color: context.appColors.textTertiary),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filteredMembers.length,
+                  itemBuilder: (context, index) {
+                    final memberId = filteredMembers[index];
+                    final isAdmin = widget.club.isAdmin(memberId);
+                    final isCurrentUser = memberId == widget.currentUserId;
 
-        return _MemberTile(
-          memberId: memberId,
-          isAdmin: isAdmin,
-          isCurrentUser: isCurrentUser,
-          onPromote: isAdmin ? null : () => _promoteMember(context, memberId),
-          onRemove: isCurrentUser ? null : () => _removeMember(context, memberId),
-        );
-      },
+                    return _MemberTile(
+                      memberId: memberId,
+                      isAdmin: isAdmin,
+                      isCurrentUser: isCurrentUser,
+                      onPromote: isAdmin ? null : () => _promoteMember(context, memberId),
+                      onRemove: isCurrentUser ? null : () => _removeMember(context, memberId),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
   void _promoteMember(BuildContext context, String memberId) {
-    final updatedClub = club.copyWith(
-      adminIds: [...club.adminIds, memberId],
+    final updatedClub = widget.club.copyWith(
+      adminIds: [...widget.club.adminIds, memberId],
     );
-    dataService.updateClub(updatedClub);
+    widget.dataService.updateClub(updatedClub);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Member promoted to admin')),
     );
@@ -179,7 +240,7 @@ class _MembersTab extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
-              dataService.leaveClub(club.id, memberId);
+              widget.dataService.leaveClub(widget.club.id, memberId);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Member removed')),

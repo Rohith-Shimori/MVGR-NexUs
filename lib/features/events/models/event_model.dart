@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Event categories
 enum EventCategory {
@@ -125,18 +125,17 @@ class Event {
     required this.createdAt,
   });
 
-  factory Event.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Event.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return Event(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       clubId: data['clubId'],
       clubName: data['clubName'],
       authorId: data['authorId'] ?? '',
       authorName: data['authorName'] ?? '',
-      eventDate: (data['eventDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      endDate: (data['endDate'] as Timestamp?)?.toDate(),
+      eventDate: data['eventDate'] != null ? DateTime.parse(data['eventDate']) : DateTime.now(),
+      endDate: data['endDate'] != null ? DateTime.parse(data['endDate']) : null,
       venue: data['venue'] ?? '',
       venueDetails: data['venueDetails'],
       maxParticipants: data['maxParticipants'],
@@ -151,7 +150,7 @@ class Event {
       requiresRegistration: data['requiresRegistration'] ?? false,
       isOnline: data['isOnline'] ?? false,
       meetingLink: data['meetingLink'],
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
     );
   }
 
@@ -163,8 +162,8 @@ class Event {
       'clubName': clubName,
       'authorId': authorId,
       'authorName': authorName,
-      'eventDate': Timestamp.fromDate(eventDate),
-      'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
+      'eventDate': eventDate.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
       'venue': venue,
       'venueDetails': venueDetails,
       'maxParticipants': maxParticipants,
@@ -176,7 +175,7 @@ class Event {
       'requiresRegistration': requiresRegistration,
       'isOnline': isOnline,
       'meetingLink': meetingLink,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
@@ -315,10 +314,9 @@ class Announcement {
     this.expiresAt,
   });
 
-  factory Announcement.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Announcement.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return Announcement(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       title: data['title'] ?? '',
       content: data['content'] ?? '',
       authorId: data['authorId'] ?? '',
@@ -326,8 +324,8 @@ class Announcement {
       authorRole: data['authorRole'] ?? '',
       isPinned: data['isPinned'] ?? false,
       isUrgent: data['isUrgent'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      expiresAt: (data['expiresAt'] as Timestamp?)?.toDate(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
+      expiresAt: data['expiresAt'] != null ? DateTime.parse(data['expiresAt']) : null,
     );
   }
 
@@ -340,8 +338,8 @@ class Announcement {
       'authorRole': authorRole,
       'isPinned': isPinned,
       'isUrgent': isUrgent,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'expiresAt': expiresAt != null ? Timestamp.fromDate(expiresAt!) : null,
+      'createdAt': createdAt.toIso8601String(),
+      'expiresAt': expiresAt?.toIso8601String(),
     };
   }
 

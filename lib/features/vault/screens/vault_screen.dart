@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../services/mock_data_service.dart';
 import '../../../services/user_service.dart';
@@ -621,16 +622,53 @@ class _UploadSheetState extends State<_UploadSheet> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _subjectController = TextEditingController();
+  final _fileUrlController = TextEditingController();
   String _branch = 'CSE';
   String _year = '1st Year';
   VaultItemType _type = VaultItemType.notes;
   bool _isLoading = false;
+  
+  // File upload state
+  bool _useFileUpload = false; // true = file picker, false = link
+  PlatformFile? _selectedFile;
 
   @override
   void dispose() {
     _titleController.dispose();
     _subjectController.dispose();
+    _fileUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'jpg', 'jpeg', 'png'],
+        allowMultiple: false,
+      );
+      
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _selectedFile = result.files.first;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking file: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeFile() {
+    setState(() {
+      _selectedFile = null;
+    });
   }
 
   @override
@@ -728,6 +766,235 @@ class _UploadSheetState extends State<_UploadSheet> {
                 displayBuilder: (v) => v.displayName,
                 onChanged: (v) => setState(() => _type = v!),
               ),
+              const SizedBox(height: 16),
+              
+              // Upload Mode Toggle
+              Text(
+                'Upload Method',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: context.appColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _useFileUpload = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: !_useFileUpload 
+                              ? AppColors.vaultColor.withValues(alpha: 0.1)
+                              : Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: !_useFileUpload 
+                                ? AppColors.vaultColor 
+                                : context.appColors.divider,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.link,
+                              size: 18,
+                              color: !_useFileUpload 
+                                  ? AppColors.vaultColor 
+                                  : context.appColors.textTertiary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Drive Link',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: !_useFileUpload 
+                                    ? AppColors.vaultColor 
+                                    : context.appColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _useFileUpload = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _useFileUpload 
+                              ? AppColors.vaultColor.withValues(alpha: 0.1)
+                              : Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _useFileUpload 
+                                ? AppColors.vaultColor 
+                                : context.appColors.divider,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.upload_file,
+                              size: 18,
+                              color: _useFileUpload 
+                                  ? AppColors.vaultColor 
+                                  : context.appColors.textTertiary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Upload File',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: _useFileUpload 
+                                    ? AppColors.vaultColor 
+                                    : context.appColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Conditional: Drive Link OR File Picker
+              if (!_useFileUpload) ...[
+                // Drive Link / File URL
+                _FormField(
+                  controller: _fileUrlController,
+                  label: 'Drive Link / File URL',
+                  hint: 'Paste Google Drive link or file URL',
+                  validator: (v) {
+                    if (!_useFileUpload && (v?.isEmpty ?? true)) {
+                      return 'File URL is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '💡 Tip: Make sure the link is set to "Anyone with the link can view"',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.appColors.textTertiary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ] else ...[
+                // File Picker Section
+                if (_selectedFile == null) ...[
+                  GestureDetector(
+                    onTap: _pickFile,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.vaultColor.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.vaultColor.withValues(alpha: 0.3),
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.cloud_upload_outlined,
+                            size: 40,
+                            color: AppColors.vaultColor,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Tap to select a file',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: context.appColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'PDF, DOC, PPT, XLS, TXT, Images',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.appColors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  // Selected File Display
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.insert_drive_file,
+                            color: AppColors.success,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _selectedFile!.name,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: context.appColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.appColors.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _removeFile,
+                          icon: const Icon(Icons.close, size: 20),
+                          color: AppColors.error,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
               const SizedBox(height: 24),
               
               // Upload Button
@@ -761,40 +1028,74 @@ class _UploadSheetState extends State<_UploadSheet> {
   }
 
   void _submit() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(seconds: 1));
-      
-      final user = MockUserService.currentUser;
-      final item = VaultItem(
-        id: 'vault_${DateTime.now().millisecondsSinceEpoch}',
-        title: _titleController.text,
-        subject: _subjectController.text,
-        branch: _branch,
-        year: int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1,
-        semester: 1,
-        type: _type,
-        uploaderId: user.uid,
-        uploaderName: user.name,
-        fileUrl: 'https://example.com/file.pdf',
-        fileName: '${_titleController.text.replaceAll(' ', '_')}.pdf',
-        fileSizeBytes: 1024 * 1024,
-        createdAt: DateTime.now(),
-      );
-      
-      if (!mounted) return;
-      context.read<MockDataService>().addVaultItem(item);
-      
-      setState(() => _isLoading = false);
-      Navigator.pop(context);
-      
+    // Validate form fields
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    
+    // Validate file selection when using file upload mode
+    if (_useFileUpload && _selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Resource uploaded successfully!'),
-          backgroundColor: AppColors.success,
+          content: Text('Please select a file to upload'),
+          backgroundColor: AppColors.error,
         ),
       );
+      return;
     }
+    
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(seconds: 1));
+    
+    final user = MockUserService.currentUser;
+    
+    // Determine file URL, name and size based on upload mode
+    final String fileUrl;
+    final String fileName;
+    final int fileSizeBytes;
+    
+    if (_useFileUpload && _selectedFile != null) {
+      // Using file picker - store local path (in real app, upload to cloud storage)
+      fileUrl = _selectedFile!.path ?? 'local://${_selectedFile!.name}';
+      fileName = _selectedFile!.name;
+      fileSizeBytes = _selectedFile!.size;
+    } else {
+      // Using link
+      fileUrl = _fileUrlController.text.trim();
+      fileName = '${_titleController.text.replaceAll(' ', '_')}.pdf';
+      fileSizeBytes = 0; // Unknown for links
+    }
+    
+    final item = VaultItem(
+      id: 'vault_${DateTime.now().millisecondsSinceEpoch}',
+      title: _titleController.text,
+      subject: _subjectController.text,
+      branch: _branch,
+      year: int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1,
+      semester: 1,
+      type: _type,
+      uploaderId: user.uid,
+      uploaderName: user.name,
+      fileUrl: fileUrl,
+      fileName: fileName,
+      fileSizeBytes: fileSizeBytes,
+      createdAt: DateTime.now(),
+    );
+    
+    if (!mounted) return;
+    context.read<MockDataService>().addVaultItem(item);
+    
+    setState(() => _isLoading = false);
+    Navigator.pop(context);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_useFileUpload 
+            ? 'File uploaded successfully!' 
+            : 'Resource linked successfully!'),
+        backgroundColor: AppColors.success,
+      ),
+    );
   }
 }
 

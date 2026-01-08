@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Type of vault item
 enum VaultItemType {
@@ -112,10 +112,9 @@ class VaultItem {
     this.tags = const [],
   });
 
-  factory VaultItem.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory VaultItem.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return VaultItem(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       uploaderId: data['uploaderId'] ?? '',
       uploaderName: data['uploaderName'] ?? '',
       title: data['title'] ?? '',
@@ -134,7 +133,7 @@ class VaultItem {
       downloadCount: data['downloadCount'] ?? 0,
       rating: (data['rating'] ?? 0.0).toDouble(),
       isApproved: data['isApproved'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
       tags: List<String>.from(data['tags'] ?? []),
     );
   }
@@ -156,7 +155,7 @@ class VaultItem {
       'downloadCount': downloadCount,
       'rating': rating,
       'isApproved': isApproved,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
       'tags': tags,
     };
   }

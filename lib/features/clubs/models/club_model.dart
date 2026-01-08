@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Category for clubs
 enum ClubCategory {
@@ -97,10 +97,9 @@ class Club {
     required this.createdBy,
   });
 
-  factory Club.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Club.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return Club(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       name: data['name'] ?? '',
       description: data['description'] ?? '',
       category: ClubCategory.values.firstWhere(
@@ -115,7 +114,7 @@ class Club {
       instagramHandle: data['instagramHandle'],
       isApproved: data['isApproved'] ?? false,
       isOfficial: data['isOfficial'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
       createdBy: data['createdBy'] ?? '',
     );
   }
@@ -133,7 +132,7 @@ class Club {
       'instagramHandle': instagramHandle,
       'isApproved': isApproved,
       'isOfficial': isOfficial,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
       'createdBy': createdBy,
     };
   }
@@ -184,7 +183,7 @@ class Club {
       name: 'Coding Club',
       description: 'A community of passionate programmers exploring cutting-edge technologies and building amazing projects together.',
       category: ClubCategory.technical,
-      adminIds: ['test_student_001'],
+      adminIds: ['test_student_001', 'club_admin_001'],
       memberIds: ['user_002', 'user_003', 'user_004'],
       isApproved: true,
       createdAt: DateTime.now().subtract(const Duration(days: 100)),
@@ -195,7 +194,7 @@ class Club {
       name: 'Music Society',
       description: 'Where melodies come alive! Join us for jamming sessions, performances, and music workshops.',
       category: ClubCategory.cultural,
-      adminIds: ['user_005'],
+      adminIds: ['user_005', 'club_admin_001'],
       memberIds: ['user_006', 'user_007'],
       isApproved: true,
       createdAt: DateTime.now().subtract(const Duration(days: 80)),
@@ -206,7 +205,7 @@ class Club {
       name: 'Robotics Team',
       description: 'Building the future, one robot at a time. Competitions, workshops, and hands-on projects.',
       category: ClubCategory.technical,
-      adminIds: ['user_008'],
+      adminIds: ['user_008', 'club_admin_001'],
       memberIds: ['user_009', 'user_010'],
       isApproved: true,
       createdAt: DateTime.now().subtract(const Duration(days: 60)),
@@ -262,10 +261,9 @@ class ClubPost {
     this.isPinned = false,
   });
 
-  factory ClubPost.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory ClubPost.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return ClubPost(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       clubId: data['clubId'] ?? '',
       authorId: data['authorId'] ?? '',
       authorName: data['authorName'] ?? '',
@@ -276,7 +274,7 @@ class ClubPost {
         orElse: () => ClubPostType.general,
       ),
       imageUrl: data['imageUrl'],
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
       isPinned: data['isPinned'] ?? false,
     );
   }
@@ -290,7 +288,7 @@ class ClubPost {
       'content': content,
       'type': type.name,
       'imageUrl': imageUrl,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
       'isPinned': isPinned,
     };
   }

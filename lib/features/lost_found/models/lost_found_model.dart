@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Status of lost/found item
 enum LostFoundStatus {
@@ -170,10 +170,9 @@ class LostFoundItem {
     this.contactInfo,
   });
 
-  factory LostFoundItem.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory LostFoundItem.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return LostFoundItem(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
       status: LostFoundStatus.values.firstWhere(
@@ -188,10 +187,9 @@ class LostFoundItem {
       description: data['description'] ?? '',
       imageUrl: data['imageUrl'],
       location: data['location'] ?? '',
-      itemDate: (data['itemDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      expiresAt: (data['expiresAt'] as Timestamp?)?.toDate() ?? 
-          DateTime.now().add(const Duration(days: 30)),
+      itemDate: data['itemDate'] != null ? DateTime.parse(data['itemDate']) : DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
+      expiresAt: data['expiresAt'] != null ? DateTime.parse(data['expiresAt']) : DateTime.now().add(const Duration(days: 30)),
       claimerId: data['claimerId'],
       claimerName: data['claimerName'],
       isContactRevealed: data['isContactRevealed'] ?? false,
@@ -209,9 +207,9 @@ class LostFoundItem {
       'description': description,
       'imageUrl': imageUrl,
       'location': location,
-      'itemDate': Timestamp.fromDate(itemDate),
-      'createdAt': Timestamp.fromDate(createdAt),
-      'expiresAt': Timestamp.fromDate(expiresAt),
+      'itemDate': itemDate.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'expiresAt': expiresAt.toIso8601String(),
       'claimerId': claimerId,
       'claimerName': claimerName,
       'isContactRevealed': isContactRevealed,
@@ -313,10 +311,9 @@ class ClaimRequest {
     required this.createdAt,
   });
 
-  factory ClaimRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory ClaimRequest.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return ClaimRequest(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       itemId: data['itemId'] ?? '',
       claimerId: data['claimerId'] ?? '',
       claimerName: data['claimerName'] ?? '',
@@ -325,7 +322,7 @@ class ClaimRequest {
         (s) => s.name == data['status'],
         orElse: () => ClaimStatus.pending,
       ),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: data['createdAt'] != null ? DateTime.parse(data['createdAt']) : DateTime.now(),
     );
   }
 
@@ -336,7 +333,7 @@ class ClaimRequest {
       'claimerName': claimerName,
       'message': message,
       'status': status.name,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }

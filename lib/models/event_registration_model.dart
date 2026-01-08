@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 /// Status of an event registration
 enum RegistrationStatus {
@@ -84,17 +84,16 @@ class EventRegistration {
       'userId': userId,
       'userName': userName,
       'status': status.name,
-      'registeredAt': Timestamp.fromDate(registeredAt),
-      'checkedInAt': checkedInAt != null ? Timestamp.fromDate(checkedInAt!) : null,
-      'cancelledAt': cancelledAt != null ? Timestamp.fromDate(cancelledAt!) : null,
+      'registeredAt': registeredAt.toIso8601String(),
+      'checkedInAt': checkedInAt?.toIso8601String(),
+      'cancelledAt': cancelledAt?.toIso8601String(),
       'formResponses': formResponses,
     };
   }
 
-  factory EventRegistration.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory EventRegistration.fromFirestore(Map<String, dynamic> data, {String? id}) {
     return EventRegistration(
-      id: doc.id,
+      id: id ?? data['id'] ?? '',
       eventId: data['eventId'] ?? '',
       eventTitle: data['eventTitle'] ?? '',
       userId: data['userId'] ?? '',
@@ -103,13 +102,9 @@ class EventRegistration {
         (s) => s.name == data['status'],
         orElse: () => RegistrationStatus.registered,
       ),
-      registeredAt: (data['registeredAt'] as Timestamp).toDate(),
-      checkedInAt: data['checkedInAt'] != null
-          ? (data['checkedInAt'] as Timestamp).toDate()
-          : null,
-      cancelledAt: data['cancelledAt'] != null
-          ? (data['cancelledAt'] as Timestamp).toDate()
-          : null,
+      registeredAt: data['registeredAt'] != null ? DateTime.parse(data['registeredAt']) : DateTime.now(),
+      checkedInAt: data['checkedInAt'] != null ? DateTime.parse(data['checkedInAt']) : null,
+      cancelledAt: data['cancelledAt'] != null ? DateTime.parse(data['cancelledAt']) : null,
       formResponses: data['formResponses'] as Map<String, dynamic>?,
     );
   }

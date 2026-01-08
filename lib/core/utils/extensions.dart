@@ -99,9 +99,9 @@ extension StringExtensions on String {
   
   /// Check if string is college email (customize domain)
   bool get isCollegeEmail {
-    // Add your college domain here, e.g., mvgr.edu.in
-    return toLowerCase().endsWith('@mvgr.edu.in') || 
-           toLowerCase().endsWith('@student.mvgr.edu.in');
+    // Add your college domain here, e.g., mvgrce.edu.in
+    return toLowerCase().endsWith('@mvgrce.edu.in') || 
+           toLowerCase().endsWith('@student.mvgrce.edu.in');
   }
   
   /// Truncate string with ellipsis
