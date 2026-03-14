@@ -1,0 +1,28 @@
+{
+  "name": "mvgr_nexus",
+  "version": "1.0.0",
+  "description": "<p align=\"center\">\r   <img src=\"assets/icons/logo.png\" alt=\"MVGR NexUs Logo\" width=\"120\" />\r </p>",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rohith-Shimori/MVGR-NexUs.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Rohith-Shimori/MVGR-NexUs/issues"
+  },
+  "homepage": "https://github.com/Rohith-Shimori/MVGR-NexUs#readme",
+  "devDependencies": {
+    "supabase": "^2.72.4"
+  }
+}
